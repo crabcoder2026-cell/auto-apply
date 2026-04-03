@@ -1,7 +1,13 @@
+import { File as BufferFile } from 'node:buffer';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { getStorageDriver, saveUploadedFile } from '@/lib/storage';
+
+/** Node 18 server often has no global `File`; avoids ReferenceError in older bundles / libs. */
+if (typeof globalThis.File === 'undefined' && typeof BufferFile === 'function') {
+  Object.assign(globalThis, { File: BufferFile });
+}
 
 const VALID_TYPES = new Set([
   'application/pdf',
