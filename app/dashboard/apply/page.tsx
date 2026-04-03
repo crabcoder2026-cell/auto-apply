@@ -139,7 +139,7 @@ export default function ApplyPage() {
       {/* Header */}
       <div className="bg-white rounded-xl shadow-md p-6">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-          <Send className="h-7 w-7 mr-2 text-indigo-600" />
+          <Send className="h-7 w-7 mr-2 text-brand-green" />
           Apply to Jobs
         </h1>
         <p className="text-gray-600 mt-2">
@@ -154,7 +154,7 @@ export default function ApplyPage() {
             onClick={() => setMode('single')}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2 ${
               mode === 'single'
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-brand-orange text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -165,7 +165,7 @@ export default function ApplyPage() {
             onClick={() => setMode('batch')}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2 ${
               mode === 'batch'
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-brand-orange text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -187,7 +187,7 @@ export default function ApplyPage() {
                 value={jobUrl}
                 onChange={(e) => setJobUrl(e.target.value)}
                 placeholder="https://boards.greenhouse.io/company/jobs/123456"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 disabled={loading}
               />
               <p className="text-sm text-gray-500 mt-1">
@@ -198,7 +198,7 @@ export default function ApplyPage() {
             <button
               onClick={handleSingleApply}
               disabled={loading || !jobUrl.trim()}
-              className="w-full flex items-center justify-center space-x-2 py-3 px-6 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              className="w-full flex items-center justify-center space-x-2 py-3 px-6 bg-brand-orange text-white rounded-lg hover:bg-brand-orange-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
               {loading ? (
                 <>
@@ -228,7 +228,7 @@ export default function ApplyPage() {
                 value={boardUrl}
                 onChange={(e) => setBoardUrl(e.target.value)}
                 placeholder="https://boards.greenhouse.io/company"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 disabled={loading}
               />
               <p className="text-sm text-gray-500 mt-1">
@@ -247,7 +247,7 @@ export default function ApplyPage() {
                   value={keywords}
                   onChange={(e) => setKeywords(e.target.value)}
                   placeholder="Software Engineer"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                   disabled={loading}
                 />
               </div>
@@ -262,7 +262,7 @@ export default function ApplyPage() {
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   placeholder="San Francisco"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                   disabled={loading}
                 />
               </div>
@@ -277,7 +277,7 @@ export default function ApplyPage() {
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
                   placeholder="Engineering"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                   disabled={loading}
                 />
               </div>
@@ -292,7 +292,7 @@ export default function ApplyPage() {
             <button
               onClick={handleBatchApply}
               disabled={loading || !boardUrl.trim()}
-              className="w-full flex items-center justify-center space-x-2 py-3 px-6 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              className="w-full flex items-center justify-center space-x-2 py-3 px-6 bg-brand-orange text-white rounded-lg hover:bg-brand-orange-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
               {loading ? (
                 <>
@@ -383,7 +383,7 @@ export default function ApplyPage() {
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
                   <div className="bg-gray-100 px-4 py-3 border-b border-gray-200">
                     <h3 className="text-sm font-semibold text-gray-800 flex items-center">
-                      <FileText className="h-4 w-4 mr-2 text-indigo-600" />
+                      <FileText className="h-4 w-4 mr-2 text-brand-green" />
                       Fields Filled ({result.result.filledFields.length})
                     </h3>
                   </div>

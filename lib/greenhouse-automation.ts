@@ -1,6 +1,6 @@
 import puppeteer, { Browser, Page } from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
-import { getFileUrl } from './s3';
+import { getResumeForAutomation } from './storage';
 import { generateFieldAnswers, AIFieldAnswer } from './ai-form-filler';
 import { fetchGreenhouseSecurityCode, ImapConfig } from './email-checker';
 import path from 'path';
@@ -42,15 +42,99 @@ export interface ApplicationResult {
   errorMessage?: string;
   filledFields?: FilledField[];
   securityCode?: string;
+  /** Set for batch applies so history can store the per-job link */
+  jobUrl?: string;
 }
 
 /**
- * Launch a headless Chromium browser using @sparticuz/chromium
+ * Try common install locations when CHROME_PATH is unset (local dev).
+ */
+function detectSystemChromePath(): string | null {
+  const candidates: string[] = [];
+  const { platform } = process;
+
+  if (platform === 'darwin') {
+    candidates.push(
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium',
+      '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
+      '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+      '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
+    );
+  } else if (platform === 'win32') {
+    const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+    const programFilesX86 =
+      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+    candidates.push(
+      path.join(programFiles, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+      path.join(
+        programFilesX86,
+        'Google',
+        'Chrome',
+        'Application',
+        'chrome.exe'
+      ),
+      path.join(programFiles, 'Chromium', 'Application', 'chrome.exe')
+    );
+  } else {
+    candidates.push(
+      '/usr/bin/google-chrome-stable',
+      '/usr/bin/google-chrome',
+      '/usr/bin/chromium',
+      '/usr/bin/chromium-browser',
+      '/snap/bin/chromium'
+    );
+  }
+
+  for (const p of candidates) {
+    try {
+      if (p && fs.existsSync(p)) return p;
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
+}
+
+/**
+ * Local: CHROME_PATH / PUPPETEER_EXECUTABLE_PATH, or auto-detect Chrome in default paths.
+ * Serverless: set USE_SPARTICUZ_CHROMIUM=true or run on AWS Lambda (AWS_LAMBDA_FUNCTION_NAME).
  */
 async function launchBrowser(): Promise<Browser> {
-  const executablePath = await chromium.executablePath();
+  const fromEnv =
+    process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH;
+  const localChrome = fromEnv || detectSystemChromePath();
 
-  const browser = await puppeteer.launch({
+  if (localChrome) {
+    if (!fromEnv) {
+      console.log(`[Puppeteer] Using Chrome at: ${localChrome}`);
+    }
+    return puppeteer.launch({
+      executablePath: localChrome,
+      headless: true,
+      args: [
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-sandbox',
+      ],
+      defaultViewport: { width: 1280, height: 800 },
+    });
+  }
+
+  const useSparticuz =
+    process.env.USE_SPARTICUZ_CHROMIUM === 'true' ||
+    !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+  if (!useSparticuz) {
+    throw new Error(
+      'Could not find Chrome. Install Google Chrome, or set CHROME_PATH (or PUPPETEER_EXECUTABLE_PATH) ' +
+        'to your Chrome/Chromium binary. On macOS with Chrome in /Applications, it is usually detected automatically. ' +
+        'Alternatively set USE_SPARTICUZ_CHROMIUM=true for serverless Chromium.'
+    );
+  }
+
+  const executablePath = await chromium.executablePath();
+  return puppeteer.launch({
     args: [
       ...chromium.args,
       '--no-sandbox',
@@ -63,8 +147,6 @@ async function launchBrowser(): Promise<Browser> {
     executablePath,
     headless: (chromium as any).headless ?? true,
   });
-
-  return browser;
 }
 
 /**
@@ -471,12 +553,13 @@ async function fillApplicationForm(
     (await typeIntoField(page, 'input[type="email"]', template.email));
   if (filledEmail) filledFields.push({ field: 'Email', value: template.email, source: 'template' });
 
-  // Phone - always use hardcoded number 6262151213
-  const phoneNumber = '6262151213';
-  const filledPhone = await typeIntoField(page, '#phone', phoneNumber) ||
-    (await typeIntoField(page, 'input[name="phone"]', phoneNumber)) ||
-    (await typeIntoField(page, 'input[type="tel"]', phoneNumber));
-  if (filledPhone) filledFields.push({ field: 'Phone', value: phoneNumber, source: 'template' });
+  const phoneNumber = template.phone?.trim() || '';
+  if (phoneNumber) {
+    const filledPhone = await typeIntoField(page, '#phone', phoneNumber) ||
+      (await typeIntoField(page, 'input[name="phone"]', phoneNumber)) ||
+      (await typeIntoField(page, 'input[type="tel"]', phoneNumber));
+    if (filledPhone) filledFields.push({ field: 'Phone', value: phoneNumber, source: 'template' });
+  }
 
   // Location - try React Select combobox first (Greenhouse uses #candidate-location), then regular input
   if (template.currentLocation) {
@@ -780,12 +863,13 @@ async function fillApplicationForm(
 
         // --- Phone (backup) ---
         else if (
+          data.phone &&
           (text.includes('phone') || text.includes('mobile') || text.includes('telephone'))
         ) {
           if (tagName === 'input') {
-            setFieldValue(input, '6262151213');
+            setFieldValue(input, data.phone);
             filledFields.add(input);
-            _labelFilled.push({ field: 'Phone', value: '6262151213' });
+            _labelFilled.push({ field: 'Phone', value: data.phone });
           }
         }
       });
@@ -1724,14 +1808,21 @@ export async function applyToSingleJob(
       apiJobInfo = await fetchJobInfoFromApi(parsed.boardToken, parsed.jobId);
     }
 
-    // Download resume to a temp file for browser upload
+    // Resolve resume: copy local file or download from signed URL into a temp path (always temp so finally can unlink safely)
     if (template.resumePath) {
       try {
-        const resumeUrl = await getFileUrl(template.resumePath, false);
-        resumeTmpPath = await downloadToTempFile(
-          resumeUrl,
-          template.resumeFileName || 'resume.pdf'
-        );
+        const source = await getResumeForAutomation(template.resumePath);
+        const baseName = template.resumeFileName || 'resume.pdf';
+        if (source?.kind === 'path') {
+          const tmpDir = os.tmpdir();
+          resumeTmpPath = path.join(
+            tmpDir,
+            `resume_${Date.now()}_${baseName.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+          );
+          fs.copyFileSync(source.path, resumeTmpPath);
+        } else if (source?.kind === 'url') {
+          resumeTmpPath = await downloadToTempFile(source.url, baseName);
+        }
       } catch (error) {
         console.error('Error preparing resume for upload:', error);
       }
@@ -2069,6 +2160,7 @@ export async function applyToBatchJobs(
         `https://boards.greenhouse.io/${boardToken}/jobs/${job.id}`;
 
       const result = await applyToSingleJob(jobUrl, template);
+      result.jobUrl = jobUrl;
 
       // Override with API data
       result.jobInfo = {

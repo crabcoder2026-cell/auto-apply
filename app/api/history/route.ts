@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { prisma } from '@/lib/prisma';
+import { listApplicationHistory } from '@/lib/json-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,19 +13,15 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = (session.user as { id?: string }).id;
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    const applications = await prisma.applicationHistory.findMany({
-      where: {
-        userId,
-      },
-      orderBy: {
-        appliedAt: 'desc',
-      },
-    });
+    const applications = await listApplicationHistory(userId);
 
     return NextResponse.json({ applications });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching history:', error);
     return NextResponse.json(
       { error: 'Failed to fetch history' },

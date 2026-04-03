@@ -6,8 +6,9 @@ import { Providers } from '@/components/providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Auto Resume - Greenhouse Job Applications',
-  description: 'Automatically apply to jobs on Greenhouse.io with your saved application template',
+  title: 'Auto Apply — Greenhouse job applications',
+  description:
+    'Automatically apply to jobs on Greenhouse with your saved application template',
 };
 
 export default function RootLayout({

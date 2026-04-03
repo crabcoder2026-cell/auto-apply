@@ -3,19 +3,21 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
+  --foreground-rgb: 17, 24, 39;
+  --background-start-rgb: 230, 244, 239;
   --background-end-rgb: 255, 255, 255;
+  --brand-green: #008148;
+  --brand-orange: #f37021;
+  --brand-red: #ee2d24;
 }
 
 body {
   color: rgb(var(--foreground-rgb));
   background: linear-gradient(
       to bottom,
-      transparent,
+      rgb(var(--background-start-rgb)),
       rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+    );
 }
 
 /* Ensure form elements always have dark text for readability */

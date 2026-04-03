@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { prisma } from '@/lib/prisma';
+import {
+  createTemplate,
+  deactivateTemplatesForUser,
+  getActiveTemplate,
+} from '@/lib/json-store';
 
 export const dynamic = 'force-dynamic';
 
-// GET: Fetch user's active application template
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -14,20 +17,15 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = (session.user as { id?: string }).id;
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    const template = await prisma.applicationTemplate.findFirst({
-      where: {
-        userId,
-        isActive: true,
-      },
-      orderBy: {
-        updatedAt: 'desc',
-      },
-    });
+    const template = await getActiveTemplate(userId);
 
     return NextResponse.json({ template });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching template:', error);
     return NextResponse.json(
       { error: 'Failed to fetch template' },
@@ -36,7 +34,6 @@ export async function GET() {
   }
 }
 
-// POST: Create or update application template
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -45,7 +42,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = (session.user as { id?: string }).id;
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     const {
@@ -68,7 +69,6 @@ export async function POST(request: Request) {
       imapPassword,
     } = body;
 
-    // Merge country and IMAP settings into additionalFields
     const additionalFields = {
       ...(rawAdditionalFields || {}),
       ...(country ? { country } : {}),
@@ -78,39 +78,26 @@ export async function POST(request: Request) {
       ...(imapPassword ? { imapPassword } : {}),
     };
 
-    // Deactivate old templates
-    await prisma.applicationTemplate.updateMany({
-      where: {
-        userId,
-        isActive: true,
-      },
-      data: {
-        isActive: false,
-      },
-    });
+    await deactivateTemplatesForUser(userId);
 
-    // Create new template
-    const template = await prisma.applicationTemplate.create({
-      data: {
-        userId,
-        resumePath: resumePath || null,
-        resumeFileName: resumeFileName || null,
-        fullName,
-        email,
-        phone: phone || null,
-        linkedinUrl: linkedinUrl || null,
-        portfolioUrl: portfolioUrl || null,
-        coverLetter: coverLetter || null,
-        workAuthStatus: workAuthStatus || null,
-        yearsExperience: yearsExperience ? parseInt(yearsExperience) : null,
-        currentLocation: currentLocation || null,
-        additionalFields: additionalFields || null,
-        isActive: true,
-      },
+    const template = await createTemplate({
+      userId,
+      resumePath: resumePath || null,
+      resumeFileName: resumeFileName || null,
+      fullName,
+      email,
+      phone: phone || null,
+      linkedinUrl: linkedinUrl || null,
+      portfolioUrl: portfolioUrl || null,
+      coverLetter: coverLetter || null,
+      workAuthStatus: workAuthStatus || null,
+      yearsExperience: yearsExperience ? parseInt(yearsExperience, 10) : null,
+      currentLocation: currentLocation || null,
+      additionalFields: additionalFields || null,
     });
 
     return NextResponse.json({ template }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating template:', error);
     return NextResponse.json(
       { error: 'Failed to create template' },

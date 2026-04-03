@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { prisma } from '@/lib/prisma';
+import { countHistoryByUser } from '@/lib/json-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,13 +13,16 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = (session.user as { id?: string }).id;
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const [total, success, failed, manual] = await Promise.all([
-      prisma.applicationHistory.count({ where: { userId } }),
-      prisma.applicationHistory.count({ where: { userId, status: 'success' } }),
-      prisma.applicationHistory.count({ where: { userId, status: 'failed' } }),
-      prisma.applicationHistory.count({ where: { userId, status: 'requires_manual' } }),
+      countHistoryByUser(userId),
+      countHistoryByUser(userId, 'success'),
+      countHistoryByUser(userId, 'failed'),
+      countHistoryByUser(userId, 'requires_manual'),
     ]);
 
     return NextResponse.json({
@@ -30,7 +33,7 @@ export async function GET() {
         manual,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching stats:', error);
     return NextResponse.json(
       { error: 'Failed to fetch stats' },

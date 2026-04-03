@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { prisma } from '@/lib/prisma';
+import { createApplicationHistory, getActiveTemplate } from '@/lib/json-store';
 import { applyToBatchJobs } from '@/lib/greenhouse-automation';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300; // 5 minutes timeout
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   try {
@@ -15,7 +15,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = (session.user as { id?: string }).id;
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { boardUrl, filters } = await request.json();
 
     if (!boardUrl) {
@@ -25,7 +29,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate URL is a Greenhouse job board
     if (!boardUrl.includes('greenhouse.io') && !boardUrl.includes('boards.greenhouse.io')) {
       return NextResponse.json(
         { error: 'Invalid Greenhouse board URL' },
@@ -33,13 +36,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get user's active template
-    const template = await prisma.applicationTemplate.findFirst({
-      where: {
-        userId,
-        isActive: true,
-      },
-    });
+    const template = await getActiveTemplate(userId);
 
     if (!template) {
       return NextResponse.json(
@@ -48,27 +45,23 @@ export async function POST(request: Request) {
       );
     }
 
-    // Apply to jobs
     const results = await applyToBatchJobs(boardUrl, template, filters);
 
-    // Save all results to application history
     const historyPromises = results.map((result) =>
-      prisma.applicationHistory.create({
-        data: {
-          userId,
-          jobTitle: result.jobInfo.jobTitle,
-          companyName: result.jobInfo.companyName,
-          jobUrl: boardUrl,
-          location: result.jobInfo.location || null,
-          department: result.jobInfo.department || null,
-          status: result.status,
-          errorMessage: result.errorMessage || null,
-          applicationData: {
-            template: {
-              fullName: template.fullName,
-              email: template.email,
-              phone: template.phone,
-            },
+      createApplicationHistory({
+        userId,
+        jobTitle: result.jobInfo.jobTitle,
+        companyName: result.jobInfo.companyName,
+        jobUrl: result.jobUrl || boardUrl,
+        location: result.jobInfo.location || null,
+        department: result.jobInfo.department || null,
+        status: result.status,
+        errorMessage: result.errorMessage || null,
+        applicationData: {
+          template: {
+            fullName: template.fullName,
+            email: template.email,
+            phone: template.phone,
           },
         },
       })
@@ -84,10 +77,11 @@ export async function POST(request: Request) {
       failedCount: results.filter((r) => r.status === 'failed').length,
       manualCount: results.filter((r) => r.status === 'requires_manual').length,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Batch application error:', error);
+    const msg = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to submit batch applications', details: error?.message },
+      { error: 'Failed to submit batch applications', details: msg },
       { status: 500 }
     );
   }

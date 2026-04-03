@@ -110,7 +110,7 @@ export default function HistoryPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-brand-green" />
       </div>
     );
   }
@@ -120,7 +120,7 @@ export default function HistoryPage() {
       {/* Header */}
       <div className="bg-white rounded-xl shadow-md p-6">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-          <History className="h-7 w-7 mr-2 text-indigo-600" />
+          <History className="h-7 w-7 mr-2 text-brand-green" />
           Application History
         </h1>
         <p className="text-gray-600 mt-2">
@@ -138,7 +138,7 @@ export default function HistoryPage() {
               placeholder="Search by job title or company..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
             />
           </div>
 
@@ -147,7 +147,7 @@ export default function HistoryPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent appearance-none"
             >
               <option value="all">All Statuses</option>
               <option value="success">Success</option>
@@ -172,7 +172,7 @@ export default function HistoryPage() {
             {applications.length === 0 && (
               <Link
                 href="/dashboard/apply"
-                className="inline-block mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                className="inline-block mt-4 px-6 py-2 bg-brand-orange text-white rounded-lg hover:bg-brand-orange-hover transition-colors"
               >
                 Apply to Your First Job
               </Link>
@@ -235,7 +235,7 @@ export default function HistoryPage() {
                         href={app.jobUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center space-x-1 text-sm text-indigo-600 hover:text-indigo-700"
+                        className="inline-flex items-center space-x-1 text-sm text-brand-green hover:text-brand-green-hover"
                       >
                         <ExternalLink className="h-4 w-4" />
                         <span>View Job</span>

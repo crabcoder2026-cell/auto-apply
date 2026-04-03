@@ -25,6 +25,14 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       colors: {
+        brand: {
+          green: '#008148',
+          'green-muted': '#e6f4ef',
+          'green-hover': '#006a3b',
+          orange: '#F37021',
+          'orange-hover': '#d95e1a',
+          red: '#EE2D24',
+        },
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

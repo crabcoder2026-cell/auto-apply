@@ -47,10 +47,32 @@ export default function TemplatePage() {
   });
   const [testingImap, setTestingImap] = useState(false);
   const [imapTestResult, setImapTestResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [storageDriver, setStorageDriver] = useState<'local' | 's3' | null>(null);
 
   useEffect(() => {
-    fetchTemplate();
+    (async () => {
+      try {
+        await Promise.all([fetchTemplate(), fetchUploadSettings()]);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
+
+  const fetchUploadSettings = async () => {
+    try {
+      const res = await fetch('/api/upload/settings');
+      const data = res.ok ? await res.json() : null;
+      if (data?.driver === 'local' || data?.driver === 's3') {
+        setStorageDriver(data.driver);
+      } else {
+        setStorageDriver('local');
+      }
+    } catch (e) {
+      console.error('Error fetching upload settings:', e);
+      setStorageDriver('local');
+    }
+  };
 
   const fetchTemplate = async () => {
     try {
@@ -81,8 +103,6 @@ export default function TemplatePage() {
       }
     } catch (error: any) {
       console.error('Error fetching template:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -107,52 +127,68 @@ export default function TemplatePage() {
     setError('');
 
     try {
-      // Get presigned URL
-      const presignedResponse = await fetch('/api/upload/presigned', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: file.name,
-          contentType: file.type,
-          isPublic: false,
-        }),
-      });
+      if (storageDriver === 'local') {
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadResponse = await fetch('/api/upload/local', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!uploadResponse.ok) {
+          const err = await uploadResponse.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to upload file');
+        }
+        const { cloud_storage_path, resumeFileName } = await uploadResponse.json();
+        setFormData((prev) => ({
+          ...prev,
+          resumePath: cloud_storage_path,
+          resumeFileName: resumeFileName || file.name,
+        }));
+      } else {
+        const presignedResponse = await fetch('/api/upload/presigned', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: file.name,
+            contentType: file.type,
+            isPublic: false,
+          }),
+        });
 
-      if (!presignedResponse.ok) {
-        throw new Error('Failed to get upload URL');
+        if (!presignedResponse.ok) {
+          throw new Error('Failed to get upload URL');
+        }
+
+        const { uploadUrl, cloud_storage_path } = await presignedResponse.json();
+
+        const url = new URL(uploadUrl);
+        const signedHeaders = url.searchParams.get('X-Amz-SignedHeaders');
+        const needsContentDisposition = signedHeaders?.includes('content-disposition');
+
+        const uploadHeaders: HeadersInit = {
+          'Content-Type': file.type,
+        };
+
+        if (needsContentDisposition) {
+          uploadHeaders['Content-Disposition'] = 'attachment';
+        }
+
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: uploadHeaders,
+          body: file,
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to upload file');
+        }
+
+        setFormData((prev) => ({
+          ...prev,
+          resumePath: cloud_storage_path,
+          resumeFileName: file.name,
+        }));
       }
-
-      const { uploadUrl, cloud_storage_path } = await presignedResponse.json();
-
-      // Check if Content-Disposition header is required
-      const url = new URL(uploadUrl);
-      const signedHeaders = url.searchParams.get('X-Amz-SignedHeaders');
-      const needsContentDisposition = signedHeaders?.includes('content-disposition');
-
-      // Upload file to S3
-      const uploadHeaders: HeadersInit = {
-        'Content-Type': file.type,
-      };
-
-      if (needsContentDisposition) {
-        uploadHeaders['Content-Disposition'] = 'attachment';
-      }
-
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: uploadHeaders,
-        body: file,
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload file');
-      }
-
-      setFormData((prev) => ({
-        ...prev,
-        resumePath: cloud_storage_path,
-        resumeFileName: file.name,
-      }));
     } catch (err: any) {
       console.error('Upload error:', err);
       setError('Failed to upload resume. Please try again.');
@@ -192,7 +228,7 @@ export default function TemplatePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-brand-green" />
       </div>
     );
   }
@@ -202,7 +238,7 @@ export default function TemplatePage() {
       <div className="bg-white rounded-xl shadow-md p-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-            <FileText className="h-7 w-7 mr-2 text-indigo-600" />
+            <FileText className="h-7 w-7 mr-2 text-brand-green" />
             Application Template
           </h1>
           <p className="text-gray-600 mt-2">
@@ -231,7 +267,7 @@ export default function TemplatePage() {
             </label>
             <div className="flex items-center space-x-4">
               <label className="flex-1 cursor-pointer">
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-indigo-400 transition-colors">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-brand-orange/50 transition-colors">
                   <div className="flex items-center justify-center space-x-2 text-gray-600">
                     {uploading ? (
                       <>
@@ -276,7 +312,7 @@ export default function TemplatePage() {
                 required
                 value={formData.fullName}
                 onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 placeholder="John Doe"
               />
             </div>
@@ -291,7 +327,7 @@ export default function TemplatePage() {
                 required
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 placeholder="john@example.com"
               />
             </div>
@@ -305,7 +341,7 @@ export default function TemplatePage() {
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 placeholder="+1 (555) 123-4567"
               />
             </div>
@@ -320,7 +356,7 @@ export default function TemplatePage() {
                 required
                 value={formData.currentLocation}
                 onChange={(e) => setFormData({ ...formData, currentLocation: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 placeholder="San Francisco, CA"
               />
               <p className="text-xs text-gray-500 mt-1">Used for &quot;Location (City)&quot; fields on Greenhouse forms</p>
@@ -334,7 +370,7 @@ export default function TemplatePage() {
                 id="country"
                 value={formData.country}
                 onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent bg-white"
               >
                 <option value="">Select country</option>
                 <option value="United States">United States</option>
@@ -400,7 +436,7 @@ export default function TemplatePage() {
                 required
                 value={formData.linkedinUrl}
                 onChange={(e) => setFormData({ ...formData, linkedinUrl: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 placeholder="https://linkedin.com/in/johndoe"
               />
               <p className="text-xs text-gray-500 mt-1">Required by most Greenhouse job applications</p>
@@ -415,7 +451,7 @@ export default function TemplatePage() {
                 type="url"
                 value={formData.portfolioUrl}
                 onChange={(e) => setFormData({ ...formData, portfolioUrl: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 placeholder="https://johndoe.com"
               />
             </div>
@@ -428,7 +464,7 @@ export default function TemplatePage() {
                 id="workAuthStatus"
                 value={formData.workAuthStatus}
                 onChange={(e) => setFormData({ ...formData, workAuthStatus: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
               >
                 <option value="">Select status</option>
                 <option value="US Citizen">US Citizen</option>
@@ -450,7 +486,7 @@ export default function TemplatePage() {
                 max="50"
                 value={formData.yearsExperience}
                 onChange={(e) => setFormData({ ...formData, yearsExperience: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 placeholder="5"
               />
             </div>
@@ -466,7 +502,7 @@ export default function TemplatePage() {
               rows={8}
               value={formData.coverLetter}
               onChange={(e) => setFormData({ ...formData, coverLetter: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
               placeholder="Write a general cover letter that can be used across applications..."
             />
           </div>
@@ -474,13 +510,13 @@ export default function TemplatePage() {
           {/* Email IMAP Settings for Security Code Verification */}
           <div className="border-t border-gray-200 pt-6 mt-6">
             <div className="flex items-center mb-4">
-              <ShieldCheck className="h-5 w-5 text-indigo-600 mr-2" />
+              <ShieldCheck className="h-5 w-5 text-brand-green mr-2" />
               <h2 className="text-lg font-semibold text-gray-900">Email Verification Settings</h2>
             </div>
             <p className="text-sm text-gray-500 mb-4">
               Greenhouse may send a security code to your email during application. Configure your email IMAP
               settings below so the app can automatically retrieve and enter the code.
-              For Gmail, you need an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline">App Password</a> (requires 2FA enabled).
+              For Gmail, you need an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" className="text-brand-green underline">App Password</a> (requires 2FA enabled).
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -509,7 +545,7 @@ export default function TemplatePage() {
                     });
                     setImapTestResult(null);
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 >
                   <option value="">Select provider...</option>
                   <option value="gmail">Gmail</option>
@@ -529,7 +565,7 @@ export default function TemplatePage() {
                   type="text"
                   value={formData.imapHost}
                   onChange={(e) => setFormData({ ...formData, imapHost: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                   placeholder="imap.gmail.com"
                   readOnly={formData.imapProvider !== 'custom' && formData.imapProvider !== ''}
                 />
@@ -544,7 +580,7 @@ export default function TemplatePage() {
                   type="number"
                   value={formData.imapPort}
                   onChange={(e) => setFormData({ ...formData, imapPort: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                   placeholder="993"
                   readOnly={formData.imapProvider !== 'custom' && formData.imapProvider !== ''}
                 />
@@ -562,7 +598,7 @@ export default function TemplatePage() {
                     setFormData({ ...formData, imapPassword: e.target.value });
                     setImapTestResult(null);
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                   placeholder={formData.imapProvider === 'gmail' ? 'Gmail App Password (16 chars)' : 'Your email password'}
                 />
                 {formData.imapProvider === 'gmail' && (
@@ -631,7 +667,7 @@ export default function TemplatePage() {
             <button
               type="submit"
               disabled={saving || !formData.fullName || !formData.email || !formData.linkedinUrl || !formData.currentLocation || !formData.country}
-              className="flex items-center space-x-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              className="flex items-center space-x-2 px-6 py-3 bg-brand-orange text-white rounded-lg hover:bg-brand-orange-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-orange disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
               {saving ? (
                 <>

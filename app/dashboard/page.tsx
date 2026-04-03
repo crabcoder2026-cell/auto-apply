@@ -60,7 +60,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-brand-green" />
       </div>
     );
   }
@@ -68,11 +68,11 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white shadow-lg">
+      <div className="bg-gradient-to-r from-brand-green to-brand-green-hover rounded-2xl p-8 text-white shadow-lg">
         <h1 className="text-3xl font-bold mb-2">
           Welcome back, {session?.user?.name || 'there'}!
         </h1>
-        <p className="text-indigo-100">
+        <p className="text-white/90">
           Automate your job applications on Greenhouse.io with your saved template
         </p>
       </div>
@@ -81,12 +81,12 @@ export default function DashboardPage() {
       <div className="bg-white rounded-xl shadow-md p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900 flex items-center">
-            <FileText className="h-6 w-6 mr-2 text-indigo-600" />
+            <FileText className="h-6 w-6 mr-2 text-brand-green" />
             Application Template
           </h2>
           <Link
             href="/dashboard/template"
-            className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+            className="text-sm font-medium text-brand-green hover:text-brand-green-hover"
           >
             {template ? 'Edit Template' : 'Create Template'}
           </Link>
@@ -158,8 +158,8 @@ export default function DashboardPage() {
               <p className="text-sm text-gray-600">Total Applications</p>
               <p className="text-3xl font-bold text-gray-900 mt-1">{stats.total}</p>
             </div>
-            <div className="h-12 w-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-              <FileText className="h-6 w-6 text-indigo-600" />
+            <div className="h-12 w-12 bg-brand-green-muted rounded-lg flex items-center justify-center">
+              <FileText className="h-6 w-6 text-brand-green" />
             </div>
           </div>
         </div>
@@ -205,11 +205,11 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Link
           href="/dashboard/apply"
-          className="group bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow border-2 border-transparent hover:border-indigo-200"
+          className="group bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow border-2 border-transparent hover:border-brand-orange/40"
         >
           <div className="flex items-center space-x-4">
-            <div className="h-12 w-12 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
-              <Upload className="h-6 w-6 text-indigo-600" />
+            <div className="h-12 w-12 bg-brand-green-muted rounded-lg flex items-center justify-center group-hover:bg-brand-orange/20 transition-colors">
+              <Upload className="h-6 w-6 text-brand-green" />
             </div>
             <div>
               <h3 className="text-lg font-bold text-gray-900">Apply to Jobs</h3>
@@ -220,11 +220,11 @@ export default function DashboardPage() {
 
         <Link
           href="/dashboard/history"
-          className="group bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow border-2 border-transparent hover:border-indigo-200"
+          className="group bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow border-2 border-transparent hover:border-brand-orange/40"
         >
           <div className="flex items-center space-x-4">
-            <div className="h-12 w-12 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
-              <FileText className="h-6 w-6 text-indigo-600" />
+            <div className="h-12 w-12 bg-brand-green-muted rounded-lg flex items-center justify-center group-hover:bg-brand-orange/20 transition-colors">
+              <FileText className="h-6 w-6 text-brand-green" />
             </div>
             <div>
               <h3 className="text-lg font-bold text-gray-900">View History</h3>
