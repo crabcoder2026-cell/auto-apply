@@ -11,6 +11,22 @@ const VALID_TYPES = new Set([
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
+/**
+ * Node.js does not define global `File` in all versions/contexts; `instanceof File` throws ReferenceError.
+ * FormData file entries are Blob-like with optional `name` (undici).
+ */
+function getUploadedBlob(
+  value: FormDataEntryValue | null
+): { blob: Blob; fileName: string } | null {
+  if (value === null || typeof value !== 'object') return null;
+  const o = value as Blob & { name?: string };
+  if (typeof o.arrayBuffer !== 'function') return null;
+  if (typeof o.size !== 'number') return null;
+  const fileName =
+    typeof o.name === 'string' && o.name.trim() ? o.name.trim() : 'resume';
+  return { blob: o, fileName };
+}
+
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -31,33 +47,35 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
-    const file = formData.get('file');
-    if (!file || !(file instanceof File)) {
+    const uploaded = getUploadedBlob(formData.get('file'));
+    if (!uploaded) {
       return NextResponse.json({ error: 'file is required' }, { status: 400 });
     }
 
-    if (!VALID_TYPES.has(file.type)) {
+    const { blob, fileName } = uploaded;
+
+    if (!VALID_TYPES.has(blob.type)) {
       return NextResponse.json(
         { error: 'Only PDF or Word documents are allowed' },
         { status: 400 }
       );
     }
 
-    if (file.size > MAX_BYTES) {
+    if (blob.size > MAX_BYTES) {
       return NextResponse.json(
         { error: 'File size must be less than 10MB' },
         { status: 400 }
       );
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const cloud_storage_path = saveUploadedFile(userId, buffer, file.name);
+    const buffer = Buffer.from(await blob.arrayBuffer());
+    const cloud_storage_path = saveUploadedFile(userId, buffer, fileName);
 
     return NextResponse.json({
       cloud_storage_path,
-      resumeFileName: file.name,
+      resumeFileName: fileName,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Local upload error:', error);
     return NextResponse.json(
       { error: 'Failed to upload file' },
