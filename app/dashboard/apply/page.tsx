@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Send, Link as LinkIcon, Briefcase, Loader2, CheckCircle, XCircle, AlertCircle, FileText, Bot, User, Copy, Shield } from 'lucide-react';
+import { PRESET_BOARDS } from '@/lib/preset-boards';
 
 interface FilledField {
   field: string;
@@ -27,6 +29,9 @@ export default function ApplyPage() {
   const [mode, setMode] = useState<'single' | 'batch'>('single');
   const [jobUrl, setJobUrl] = useState('');
   const [boardUrl, setBoardUrl] = useState('');
+  const [selectedPresets, setSelectedPresets] = useState<Record<string, boolean>>(
+    {}
+  );
   const [keywords, setKeywords] = useState('');
   const [location, setLocation] = useState('');
   const [department, setDepartment] = useState('');
@@ -66,9 +71,17 @@ export default function ApplyPage() {
     }
   };
 
+  const togglePreset = (id: string) => {
+    setSelectedPresets((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const handleBatchApply = async () => {
-    if (!boardUrl.trim()) {
-      setError('Please enter a board URL');
+    const presetIds = PRESET_BOARDS.filter((b) => selectedPresets[b.id]).map(
+      (b) => b.id
+    );
+    const usePresets = presetIds.length > 0;
+    if (!usePresets && !boardUrl.trim()) {
+      setError('Select at least one preset company or enter a custom board URL');
       return;
     }
 
@@ -76,19 +89,25 @@ export default function ApplyPage() {
     setError('');
     setResult(null);
 
+    const filters = {
+      keywords: keywords || undefined,
+      location: location || undefined,
+      department: department || undefined,
+    };
+
     try {
-      const response = await fetch('/api/apply/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          boardUrl,
-          filters: {
-            keywords: keywords || undefined,
-            location: location || undefined,
-            department: department || undefined,
-          },
-        }),
-      });
+      const response = await fetch(
+        usePresets ? '/api/apply/preset-batch' : '/api/apply/batch',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            usePresets
+              ? { boardIds: presetIds, filters }
+              : { boardUrl, filters }
+          ),
+        }
+      );
 
       const data = await response.json();
 
@@ -97,7 +116,7 @@ export default function ApplyPage() {
       }
 
       setResult(data);
-      setBoardUrl('');
+      if (!usePresets) setBoardUrl('');
       setKeywords('');
       setLocation('');
       setDepartment('');
@@ -219,8 +238,43 @@ export default function ApplyPage() {
         {mode === 'batch' && (
           <div className="space-y-4">
             <div>
+              <p className="block text-sm font-medium text-gray-700 mb-2">
+                Preset companies
+              </p>
+              <div className="space-y-2">
+                {PRESET_BOARDS.map((b) => (
+                  <label
+                    key={b.id}
+                    className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!selectedPresets[b.id]}
+                      onChange={() => togglePreset(b.id)}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-brand-orange"
+                      disabled={loading}
+                    />
+                    <div>
+                      <span className="font-medium text-gray-900">{b.name}</span>
+                      <p className="text-xs text-gray-500 break-all">{b.url}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                If you select any preset, only those boards are used for this run
+                (custom URL is ignored). For hands-off auto-apply on a schedule and
+                duplicate protection,{' '}
+                <Link href="/dashboard/watch" className="text-brand-green font-medium hover:underline">
+                  set up Auto pilot
+                </Link>
+                .
+              </p>
+            </div>
+
+            <div>
               <label htmlFor="boardUrl" className="block text-sm font-medium text-gray-700 mb-2">
-                Greenhouse Job Board URL *
+                Custom Greenhouse board URL (optional)
               </label>
               <input
                 id="boardUrl"
@@ -232,7 +286,7 @@ export default function ApplyPage() {
                 disabled={loading}
               />
               <p className="text-sm text-gray-500 mt-1">
-                Enter the company's Greenhouse job board URL
+                Used when no preset is selected — enter any Greenhouse job board URL
               </p>
             </div>
 
@@ -285,13 +339,17 @@ export default function ApplyPage() {
 
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Batch applications are limited to 10 jobs per request to ensure quality submissions.
+                <strong>Note:</strong> Each board run is limited to 10 jobs per request. Auto pilot
+                uses fewer per board per run so scheduled runs stay within hosting timeouts.
               </p>
             </div>
 
             <button
               onClick={handleBatchApply}
-              disabled={loading || !boardUrl.trim()}
+              disabled={
+                loading ||
+                (!Object.values(selectedPresets).some(Boolean) && !boardUrl.trim())
+              }
               className="w-full flex items-center justify-center space-x-2 py-3 px-6 bg-brand-orange text-white rounded-lg hover:bg-brand-orange-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
               {loading ? (

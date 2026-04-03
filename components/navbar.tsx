@@ -4,7 +4,7 @@ import { signOut } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FileText, Send, History, LogOut, Menu, X } from 'lucide-react';
+import { FileText, Send, History, LogOut, Menu, X, Gauge } from 'lucide-react';
 import { useState } from 'react';
 
 export function Navbar() {
@@ -14,6 +14,7 @@ export function Navbar() {
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: FileText },
     { href: '/dashboard/apply', label: 'Apply to Jobs', icon: Send },
+    { href: '/dashboard/watch', label: 'Auto pilot', icon: Gauge },
     { href: '/dashboard/history', label: 'History', icon: History },
   ];
 

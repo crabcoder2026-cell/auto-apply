@@ -2087,6 +2087,12 @@ export async function applyToBatchJobs(
     keywords?: string;
     location?: string;
     department?: string;
+  },
+  options?: {
+    /** Skip jobs already in this set (keys: `${boardToken}:${jobId}`) */
+    dedupeKeys?: Set<string>;
+    /** Max jobs to apply this run (default 10) */
+    maxJobs?: number;
   }
 ): Promise<ApplicationResult[]> {
   const results: ApplicationResult[] = [];
@@ -2149,7 +2155,16 @@ export async function applyToBatchJobs(
       );
     }
 
-    const limitedJobs = filteredJobs.slice(0, 10);
+    if (options?.dedupeKeys && options.dedupeKeys.size > 0) {
+      const dedupe = options.dedupeKeys;
+      filteredJobs = filteredJobs.filter((j) => {
+        const key = `${boardToken}:${j.id}`;
+        return !dedupe.has(key);
+      });
+    }
+
+    const maxJobs = options?.maxJobs ?? 10;
+    const limitedJobs = filteredJobs.slice(0, maxJobs);
     console.log(
       `Found ${filteredJobs.length} matching jobs, applying to ${limitedJobs.length}`
     );
@@ -2199,7 +2214,7 @@ export async function applyToBatchJobs(
 /**
  * Fetch all jobs from a Greenhouse board via public API
  */
-async function fetchBoardJobs(
+export async function fetchBoardJobs(
   boardToken: string
 ): Promise<{ jobs: any[]; name: string } | null> {
   try {
@@ -2217,10 +2232,12 @@ async function fetchBoardJobs(
 /**
  * Extract board token from URL
  */
-function extractBoardToken(url: string): string | null {
+export function extractBoardToken(url: string): string | null {
   const patterns = [
     /boards\.greenhouse\.io\/([\w-]+)/,
     /job-boards\.greenhouse\.io\/ts\/([\w-]+)/,
+    /** e.g. https://job-boards.greenhouse.io/wppmedia */
+    /job-boards\.greenhouse\.io\/(?!ts\/)([\w-]+)/,
   ];
   for (const p of patterns) {
     const m = url.match(p);

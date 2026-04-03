@@ -48,10 +48,26 @@ export interface JsonApplicationHistory {
   applicationData: unknown | null;
 }
 
+/** Auto pilot / watch: preset boards + filters, dedupe by boardToken:jobId */
+export interface WatchConfig {
+  userId: string;
+  enabled: boolean;
+  /** Preset board ids e.g. wppmedia, capco */
+  selectedBoardIds: string[];
+  keywords: string;
+  location: string;
+  department: string;
+  appliedJobKeys: string[];
+  lastRunAt: string | null;
+  lastRunSummary: string | null;
+  updatedAt: string;
+}
+
 interface Store {
   users: JsonUser[];
   templates: JsonApplicationTemplate[];
   applicationHistory: JsonApplicationHistory[];
+  watchConfigs: WatchConfig[];
 }
 
 function readStoreSync(): Store {
@@ -61,12 +77,15 @@ function readStoreSync(): Store {
       users: [],
       templates: [],
       applicationHistory: [],
+      watchConfigs: [],
     };
     fs.writeFileSync(STORE_FILE, JSON.stringify(empty, null, 2), 'utf-8');
     return empty;
   }
   const raw = fs.readFileSync(STORE_FILE, 'utf-8');
-  return JSON.parse(raw) as Store;
+  const parsed = JSON.parse(raw) as Store;
+  if (!parsed.watchConfigs) parsed.watchConfigs = [];
+  return parsed;
 }
 
 function writeStoreSync(store: Store): void {
@@ -256,4 +275,111 @@ export async function countHistoryByUser(
   return store.applicationHistory.filter(
     (h) => h.userId === userId && (status == null || h.status === status)
   ).length;
+}
+
+function defaultWatchConfig(userId: string): WatchConfig {
+  const now = new Date().toISOString();
+  return {
+    userId,
+    enabled: false,
+    selectedBoardIds: [],
+    keywords: '',
+    location: '',
+    department: '',
+    appliedJobKeys: [],
+    lastRunAt: null,
+    lastRunSummary: null,
+    updatedAt: now,
+  };
+}
+
+export async function getWatchConfig(
+  userId: string
+): Promise<WatchConfig> {
+  const store = readStoreSync();
+  const found = store.watchConfigs.find((w) => w.userId === userId);
+  return found ?? defaultWatchConfig(userId);
+}
+
+export async function upsertWatchConfig(
+  userId: string,
+  data: Partial<
+    Omit<WatchConfig, 'userId' | 'appliedJobKeys' | 'lastRunAt' | 'lastRunSummary'>
+  > & {
+    appliedJobKeys?: string[];
+    lastRunAt?: string | null;
+    lastRunSummary?: string | null;
+  }
+): Promise<WatchConfig> {
+  return queueWrite(() => {
+    const store = readStoreSync();
+    if (!store.watchConfigs) store.watchConfigs = [];
+    const idx = store.watchConfigs.findIndex((w) => w.userId === userId);
+    const now = new Date().toISOString();
+    if (idx === -1) {
+      const row: WatchConfig = {
+        ...defaultWatchConfig(userId),
+        ...data,
+        userId,
+        appliedJobKeys: data.appliedJobKeys ?? [],
+        updatedAt: now,
+      };
+      store.watchConfigs.push(row);
+      writeStoreSync(store);
+      return row;
+    }
+    const prev = store.watchConfigs[idx];
+    const next: WatchConfig = {
+      ...prev,
+      ...data,
+      userId,
+      appliedJobKeys:
+        data.appliedJobKeys !== undefined ? data.appliedJobKeys : prev.appliedJobKeys,
+      lastRunAt:
+        data.lastRunAt !== undefined ? data.lastRunAt : prev.lastRunAt,
+      lastRunSummary:
+        data.lastRunSummary !== undefined
+          ? data.lastRunSummary
+          : prev.lastRunSummary,
+      updatedAt: now,
+    };
+    store.watchConfigs[idx] = next;
+    writeStoreSync(store);
+    return next;
+  });
+}
+
+export async function mergeAppliedJobKeys(
+  userId: string,
+  newKeys: string[]
+): Promise<void> {
+  if (newKeys.length === 0) return;
+  return queueWrite(() => {
+    const store = readStoreSync();
+    if (!store.watchConfigs) store.watchConfigs = [];
+    const idx = store.watchConfigs.findIndex((w) => w.userId === userId);
+    const set = new Set<string>();
+    if (idx >= 0) {
+      for (const k of store.watchConfigs[idx].appliedJobKeys) set.add(k);
+    }
+    for (const k of newKeys) set.add(k);
+    const merged = Array.from(set);
+    if (idx === -1) {
+      store.watchConfigs.push({
+        ...defaultWatchConfig(userId),
+        appliedJobKeys: merged,
+        updatedAt: new Date().toISOString(),
+      });
+    } else {
+      store.watchConfigs[idx].appliedJobKeys = merged;
+      store.watchConfigs[idx].updatedAt = new Date().toISOString();
+    }
+    writeStoreSync(store);
+  });
+}
+
+export async function listEnabledWatchConfigs(): Promise<WatchConfig[]> {
+  const store = readStoreSync();
+  if (!store.watchConfigs) return [];
+  return store.watchConfigs.filter((w) => w.enabled);
 }
