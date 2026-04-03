@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { createApplicationHistory, getActiveTemplate } from '@/lib/json-store';
-import { applyToBatchJobs } from '@/lib/greenhouse-automation';
+import {
+  applyToBatchJobs,
+  isValidJobPageUrl,
+  resolveGreenhouseBoardInputUrl,
+} from '@/lib/greenhouse-automation';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -29,9 +33,20 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!boardUrl.includes('greenhouse.io') && !boardUrl.includes('boards.greenhouse.io')) {
+    if (!isValidJobPageUrl(boardUrl)) {
       return NextResponse.json(
-        { error: 'Invalid Greenhouse board URL' },
+        { error: 'Enter a valid http(s) board or careers page URL' },
+        { status: 400 }
+      );
+    }
+
+    const resolvedBoardUrl = await resolveGreenhouseBoardInputUrl(boardUrl);
+    if (!resolvedBoardUrl) {
+      return NextResponse.json(
+        {
+          error:
+            'Could not find a Greenhouse job board on that page. Use a direct boards.greenhouse.io or job-boards.greenhouse.io board URL, or a careers page that embeds Greenhouse.',
+        },
         { status: 400 }
       );
     }
@@ -45,14 +60,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const results = await applyToBatchJobs(boardUrl, template, filters);
+    const results = await applyToBatchJobs(resolvedBoardUrl, template, filters);
 
     const historyPromises = results.map((result) =>
       createApplicationHistory({
         userId,
         jobTitle: result.jobInfo.jobTitle,
         companyName: result.jobInfo.companyName,
-        jobUrl: result.jobUrl || boardUrl,
+        jobUrl: result.jobUrl || resolvedBoardUrl,
         location: result.jobInfo.location || null,
         department: result.jobInfo.department || null,
         status: result.status,

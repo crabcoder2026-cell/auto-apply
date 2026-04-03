@@ -258,15 +258,104 @@ async function fetchJobInfoFromApi(
 function parseGreenhouseUrl(
   url: string
 ): { boardToken: string; jobId: string } | null {
-  const patterns = [
+  const standardPatterns = [
     /boards\.greenhouse\.io\/([\w-]+)\/jobs\/(\d+)/,
     /job-boards\.greenhouse\.io\/ts\/([\w-]+)\/jobs\/(\d+)/,
-    /boards\.greenhouse\.io\/embed\/job_app\?.*for=([\w-]+).*token=(\d+)/,
+    /** e.g. https://job-boards.greenhouse.io/acme/jobs/12345 */
+    /job-boards\.greenhouse\.io\/(?!ts\/)([\w-]+)\/jobs\/(\d+)/,
   ];
-  for (const pattern of patterns) {
+  for (const pattern of standardPatterns) {
     const match = url.match(pattern);
     if (match) return { boardToken: match[1], jobId: match[2] };
   }
+  const embedForFirst = url.match(
+    /boards\.greenhouse\.io\/embed\/job_app\?[^#]*for=([\w-]+)[^#]*token=(\d+)/i
+  );
+  if (embedForFirst) {
+    return { boardToken: embedForFirst[1], jobId: embedForFirst[2] };
+  }
+  const embedTokenFirst = url.match(
+    /boards\.greenhouse\.io\/embed\/job_app\?[^#]*token=(\d+)[^#]*for=([\w-]+)/i
+  );
+  if (embedTokenFirst) {
+    return { boardToken: embedTokenFirst[2], jobId: embedTokenFirst[1] };
+  }
+  return null;
+}
+
+/** Accept any careers / job page URL; automation still requires an on-page Greenhouse form or embed. */
+export function isValidJobPageUrl(url: string): boolean {
+  try {
+    const u = new URL(String(url).trim());
+    return u.protocol === 'https:' || u.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+/** True if the main document already shows a Greenhouse-style application form (not only an empty embed iframe). */
+async function mainFrameHasGreenhouseApplicationForm(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    return !!(
+      document.querySelector('#application_form') ||
+      document.querySelector('form#application_form') ||
+      document.querySelector('form[action*="greenhouse"]') ||
+      document.querySelector('#first_name') ||
+      document.querySelector('input[name="first_name"]') ||
+      document.querySelector('input[autocomplete="given-name"]')
+    );
+  });
+}
+
+/**
+ * Find a navigable Greenhouse job / application URL embedded on a third-party careers page.
+ */
+async function discoverGreenhouseApplicationUrl(page: Page): Promise<string | null> {
+  const current = page.url();
+  if (parseGreenhouseUrl(current)) return current;
+
+  const collected = await page.evaluate(() => {
+    const out: string[] = [];
+    const add = (raw: string | null | undefined) => {
+      if (!raw || !raw.trim()) return;
+      if (!/greenhouse|grnhse/i.test(raw)) return;
+      try {
+        const abs = new URL(raw, window.location.href).href;
+        out.push(abs);
+      } catch {
+        /* ignore */
+      }
+    };
+    document
+      .querySelectorAll(
+        'iframe[src*="greenhouse"], iframe[src*="grnhse"], iframe[id*="grnhse"]'
+      )
+      .forEach((el) => add((el as HTMLIFrameElement).src));
+    document
+      .querySelectorAll('a[href*="greenhouse.io"], a[href*="grnhse"]')
+      .forEach((el) => add((el as HTMLAnchorElement).href));
+    const canon = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    add(canon?.href);
+    return [...new Set(out)];
+  });
+
+  for (const href of collected) {
+    if (parseGreenhouseUrl(href)) return href;
+    if (/greenhouse\.io\/.+\/jobs\/\d+/i.test(href)) return href;
+  }
+
+  const html = await page.content();
+  const regexes = [
+    /https?:\/\/(?:www\.)?boards\.greenhouse\.io\/[\w-]+\/jobs\/\d+/gi,
+    /https?:\/\/job-boards\.greenhouse\.io\/ts\/[\w-]+\/jobs\/\d+/gi,
+    /https?:\/\/job-boards\.greenhouse\.io\/[\w-]+\/jobs\/\d+/gi,
+    /https?:\/\/boards\.greenhouse\.io\/embed\/job_app\?[^"'>\s]+/gi,
+  ];
+  for (const re of regexes) {
+    const m = re.exec(html);
+    if (m?.[0]) return m[0];
+  }
+
   return null;
 }
 
@@ -360,9 +449,14 @@ async function fillReactSelect(
     );
     if (!isCombobox) return false;
 
-    // Click to focus
+    await page.evaluate((s) => {
+      const n = document.querySelector(s);
+      n?.scrollIntoView({ block: 'center', inline: 'nearest' });
+    }, selector);
+
+    // Open dropdown first (click to focus), then type to filter — required for React Select
     await el.click();
-    await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 350));
 
     // Clear any existing text
     await page.keyboard.down('Control');
@@ -377,11 +471,12 @@ async function fillReactSelect(
 
     // Wait for the dropdown menu to appear
     try {
-      await page.waitForSelector('.select__menu, .select__menu-list, .select__option', { timeout: 2000 });
+      await page.waitForSelector('.select__menu, .select__menu-list, .select__option', {
+        timeout: 2800,
+      });
     } catch {
-      // Menu didn't appear; try pressing ArrowDown to open it
       await page.keyboard.press('ArrowDown');
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 550));
     }
 
     // Try to click the best matching option
@@ -935,11 +1030,7 @@ async function fillApplicationForm(
   return filledFields;
 }
 
-/**
- * Extract unfilled required fields from the page for AI filling.
- * Returns structured field info for each empty required field.
- */
-async function extractUnfilledFields(page: Page): Promise<Array<{
+type UnfilledFieldExtraction = {
   label: string;
   type: 'text' | 'textarea' | 'select' | 'radio' | 'checkbox';
   options?: string[];
@@ -948,7 +1039,74 @@ async function extractUnfilledFields(page: Page): Promise<Array<{
   name?: string;
   placeholder?: string;
   index: number;
-}>> {
+};
+
+/** CSS selector for an element id — Node has no `CSS.escape`, so use attribute form. */
+function selectorForElementId(id: string): string {
+  const escaped = id.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return `[id="${escaped}"]`;
+}
+
+/**
+ * Open each React Select combobox, read option labels, then close (Escape).
+ * Gives the LLM exact strings for dropdown answers.
+ */
+async function enrichReactSelectFieldOptions(
+  page: Page,
+  fields: UnfilledFieldExtraction[]
+): Promise<void> {
+  for (const f of fields) {
+    if (f.type !== 'select' || (f.options && f.options.length > 0)) continue;
+    if (!f.id) continue;
+    const sel = selectorForElementId(f.id);
+    try {
+      await page.evaluate((s) => {
+        document.querySelector(s)?.scrollIntoView({
+          block: 'center',
+          inline: 'nearest',
+        });
+      }, sel);
+      const handle = await page.$(sel);
+      if (!handle) continue;
+      const isRs = await handle.evaluate((e) =>
+        e.getAttribute('role') === 'combobox' ||
+        (e as HTMLElement).classList.contains('select__input')
+      );
+      if (!isRs) continue;
+
+      await handle.click();
+      await new Promise((r) => setTimeout(r, 450));
+      try {
+        await page.waitForSelector('.select__menu .select__option, .select__option', {
+          timeout: 2800,
+        });
+      } catch {
+        await page.keyboard.press('ArrowDown');
+        await new Promise((r) => setTimeout(r, 400));
+      }
+
+      const opts = await page.evaluate(() =>
+        Array.from(
+          document.querySelectorAll('.select__menu .select__option, .select__option')
+        )
+          .map((o) => (o.textContent || '').trim())
+          .filter((t) => t.length > 0)
+      );
+      if (opts.length > 0) f.options = opts;
+
+      await page.keyboard.press('Escape');
+      await new Promise((r) => setTimeout(r, 280));
+    } catch (e) {
+      console.warn('enrichReactSelectFieldOptions:', f.id, e);
+    }
+  }
+}
+
+/**
+ * Extract unfilled required fields from the page for AI filling.
+ * Returns structured field info for each empty required field.
+ */
+async function extractUnfilledFields(page: Page): Promise<UnfilledFieldExtraction[]> {
   return page.evaluate(() => {
     const fields: Array<{
       label: string;
@@ -963,18 +1121,38 @@ async function extractUnfilledFields(page: Page): Promise<Array<{
 
     let fieldIndex = 0;
 
-    // Helper: check if a field is truly required
+    // Helper: check if a field is truly required (Greenhouse / custom questions)
     function isFieldRequired(el: HTMLElement, labelText: string): boolean {
       if ((el as HTMLInputElement).required) return true;
       if (el.getAttribute('aria-required') === 'true') return true;
-      // Check if label has asterisk or "required" text
+      const descId = el.getAttribute('aria-describedby');
+      if (descId) {
+        for (const part of descId.split(/\s+/)) {
+          const d = document.getElementById(part);
+          if (d?.textContent?.toLowerCase().includes('required')) return true;
+        }
+      }
       if (labelText.includes('*') || labelText.toLowerCase().includes('required')) return true;
-      // Check parent container for required indicators
-      const parent = el.closest('.field, .field-group, [class*="field"]');
+
+      let walk: HTMLElement | null = el;
+      for (let depth = 0; depth < 8 && walk; depth++) {
+        const cls = (walk.className && String(walk.className)) || '';
+        if (/\brequired\b/i.test(cls)) return true;
+        if (walk.getAttribute('data-required') === 'true') return true;
+        walk = walk.parentElement;
+      }
+
+      const fs = el.closest('fieldset');
+      if (fs?.querySelector('legend')?.textContent?.includes('*')) return true;
+
+      const parent = el.closest(
+        '.field, .field-group, [class*="field"], [class*="question"], .application-form, [class*="application"]'
+      );
       if (parent) {
-        const requiredBadge = parent.querySelector('.required, [class*="required"], .asterisk');
+        const requiredBadge = parent.querySelector(
+          '.required, [class*="required"], .asterisk, [class*="Required"]'
+        );
         if (requiredBadge) return true;
-        // Check for asterisk in parent text but not in option labels
         const parentLabel = parent.querySelector('label');
         if (parentLabel && parentLabel.textContent?.includes('*')) return true;
       }
@@ -1015,25 +1193,61 @@ async function extractUnfilledFields(page: Page): Promise<Array<{
       return true;
     }
 
-    // Helper: find label text for a field
+    // Helper: find label text for a field (custom questions, React, etc.)
     function findLabelForField(el: HTMLElement): string {
-      // Check for label with matching 'for' attribute
       const id = el.id;
       if (id) {
-        const label = document.querySelector(`label[for="${id}"]`);
-        if (label) return (label.textContent || '').trim();
+        try {
+          const label = document.querySelector(`label[for="${CSS.escape(id)}"]`);
+          if (label) return (label.textContent || '').trim();
+        } catch {
+          const label = document.querySelector(`label[for="${id}"]`);
+          if (label) return (label.textContent || '').trim();
+        }
       }
-      // Check parent label
-      const parentLabel = el.closest('label');
-      if (parentLabel) return (parentLabel.textContent || '').trim();
-      // Check previous sibling label
+      const wrapLabel = el.closest('label');
+      if (wrapLabel && wrapLabel !== el) {
+        const inner = wrapLabel.querySelector('input, textarea, select');
+        if (inner === el) return (wrapLabel.textContent || '').trim();
+      }
       const prev = el.previousElementSibling;
       if (prev && prev.tagName === 'LABEL') return (prev.textContent || '').trim();
-      // Check parent container for label
-      const parent = el.closest('.field, .field-group, [class*="field"], .form-group');
+      const parent = el.closest(
+        '.field, .field-group, [class*="field"], [class*="question"], .form-group'
+      );
       if (parent) {
         const label = parent.querySelector('label');
         if (label) return (label.textContent || '').trim();
+        const heading = parent.querySelector(
+          'h2, h3, h4, h5, .field-label, [class*="label"], [class*="Label"]'
+        );
+        if (heading) return (heading.textContent || '').trim();
+      }
+      const labelledBy = el.getAttribute('aria-labelledby');
+      if (labelledBy) {
+        const parts = labelledBy
+          .split(/\s+/)
+          .map((lid) => document.getElementById(lid)?.textContent?.trim() || '')
+          .filter(Boolean);
+        if (parts.length) return parts.join(' ');
+      }
+      return '';
+    }
+
+    function getFallbackLabel(el: HTMLElement): string {
+      const al = el.getAttribute('aria-label');
+      if (al && al.trim().length > 1) return al.trim();
+      const ph = (el as HTMLInputElement).placeholder;
+      if (ph && ph.length > 2 && !/^https?:\/\//i.test(ph)) return ph.trim();
+      const name = (el as HTMLInputElement).name;
+      if (name && name.length > 1) {
+        return name
+          .replace(/[_-]+/g, ' ')
+          .replace(/([a-z])([A-Z])/g, '$1 $2')
+          .trim();
+      }
+      if (el.id && el.id.length > 1) {
+        return el.id.replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
       }
       return '';
     }
@@ -1056,7 +1270,8 @@ async function extractUnfilledFields(page: Page): Promise<Array<{
       if (htmlEl.className.includes('requiredInput')) return;
 
       const labelText = findLabelForField(htmlEl);
-      const isRequired = isFieldRequired(htmlEl, labelText);
+      const combinedLabel = (labelText || getFallbackLabel(htmlEl)).trim();
+      const isRequired = isFieldRequired(htmlEl, combinedLabel);
 
       // Detect React Select combobox inputs (Greenhouse uses these instead of native <select>)
       const isReactSelect = (
@@ -1077,8 +1292,7 @@ async function extractUnfilledFields(page: Page): Promise<Array<{
       // Only fill mandatory/required fields (marked with *)
       if (!isEmpty) return;
       if (!isRequired) return;
-      // Skip if no label (we can't identify the field)
-      if (!labelText) return;
+      if (!combinedLabel) return;
 
       // Avoid duplicates for same id
       if (el.id && processedIds.has(el.id)) return;
@@ -1124,7 +1338,7 @@ async function extractUnfilledFields(page: Page): Promise<Array<{
       }
 
       fields.push({
-        label: labelText,
+        label: combinedLabel,
         type: fieldType,
         options: options,
         required: isRequired,
@@ -1310,7 +1524,13 @@ async function fillFieldsWithAIAnswers(page: Page, answers: AIFieldAnswer[]): Pr
           console.log(`AI fill: React Select "${answer.label}" failed to select option`);
         }
       } else if (tag === 'select' && optionValue !== null) {
-        // Native <select> — use page.select()
+        // Native <select> — focus/click first so custom handlers run, then pick option
+        await page.evaluate((s) => {
+          const n = document.querySelector(s);
+          n?.scrollIntoView({ block: 'center', inline: 'nearest' });
+        }, selector);
+        await page.click(selector);
+        await new Promise((r) => setTimeout(r, 120));
         await page.select(selector, optionValue);
         actuallyFilled.push({ field: cleanLabel, value: displayValue, source: 'ai' });
         console.log(`AI filled select "${answer.label}" = "${answer.answer}"`);
@@ -1326,8 +1546,11 @@ async function fillFieldsWithAIAnswers(page: Page, answers: AIFieldAnswer[]): Pr
           console.log(`AI filled checkbox "${answer.label}"`);
         }
       } else if (tag === 'input' || tag === 'textarea') {
-        // Clear the field first, then type into it
-        await page.click(selector, { clickCount: 3 }); // Select all text
+        await page.evaluate((s) => {
+          const n = document.querySelector(s);
+          n?.scrollIntoView({ block: 'center', inline: 'nearest' });
+        }, selector);
+        await page.click(selector, { clickCount: 3 });
         await page.type(selector, answer.answer);
         actuallyFilled.push({ field: cleanLabel, value: displayValue, source: 'ai' });
         console.log(`AI filled text "${answer.label}" = "${answer.answer}"`);
@@ -1799,14 +2022,8 @@ export async function applyToSingleJob(
   let resumeTmpPath: string | null = null;
 
   try {
-    // Parse URL for API-based job info
-    const parsed = parseGreenhouseUrl(jobUrl);
-
-    // Try to get job info from the API first (more reliable)
-    let apiJobInfo: JobInfo | null = null;
-    if (parsed) {
-      apiJobInfo = await fetchJobInfoFromApi(parsed.boardToken, parsed.jobId);
-    }
+    /** Refined after navigation (redirects / embedded Greenhouse discovery). */
+    let parsed = parseGreenhouseUrl(jobUrl);
 
     // Resolve resume: copy local file or download from signed URL into a temp path (always temp so finally can unlink safely)
     if (template.resumePath) {
@@ -1838,10 +2055,43 @@ export async function applyToSingleJob(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     );
 
-    // Navigate to the job page
+    // Navigate to the job page (may be a company careers site that embeds Greenhouse)
     console.log('Navigating to job page...');
     await page.goto(jobUrl, { waitUntil: 'networkidle2', timeout: 30000 });
     await new Promise((r) => setTimeout(r, 2000));
+
+    let hasGhForm = await mainFrameHasGreenhouseApplicationForm(page);
+    if (!hasGhForm) {
+      const discovered = await discoverGreenhouseApplicationUrl(page);
+      if (discovered) {
+        console.log('Opening embedded Greenhouse URL:', discovered);
+        await page.goto(discovered, { waitUntil: 'networkidle2', timeout: 30000 });
+        await new Promise((r) => setTimeout(r, 2000));
+        hasGhForm = await mainFrameHasGreenhouseApplicationForm(page);
+      }
+    }
+
+    if (!hasGhForm) {
+      return {
+        success: false,
+        jobInfo: {
+          jobTitle: 'Unknown',
+          companyName: 'Unknown',
+          location: 'Unknown',
+          department: 'Unknown',
+        },
+        status: 'requires_manual',
+        errorMessage:
+          'No Greenhouse application form was found. Use a URL that loads Greenhouse (e.g. a careers page with an embedded board, or a direct boards.greenhouse.io / job-boards.greenhouse.io job link).',
+      };
+    }
+
+    parsed = parseGreenhouseUrl(page.url()) ?? parsed;
+
+    let apiJobInfo: JobInfo | null = null;
+    if (parsed) {
+      apiJobInfo = await fetchJobInfoFromApi(parsed.boardToken, parsed.jobId);
+    }
 
     // Extract job info from the page
     const pageJobInfo = await extractJobInfo(page);
@@ -1893,37 +2143,45 @@ export async function applyToSingleJob(
     console.log('Filling out application form with template data...');
     const allFilledFields: FilledField[] = await fillApplicationForm(page, template, resumeTmpPath);
 
-    // Step 2: Extract any unfilled fields and use AI to fill them
-    console.log('Checking for unfilled fields...');
-    const unfilledFields = await extractUnfilledFields(page);
-    if (unfilledFields.length > 0) {
-      console.log(`Found ${unfilledFields.length} unfilled fields, using AI to generate answers...`);
-      const userContext = {
-        fullName: template.fullName,
-        email: template.email,
-        phone: template.phone,
-        linkedinUrl: template.linkedinUrl,
-        portfolioUrl: template.portfolioUrl,
-        coverLetter: template.coverLetter,
-        workAuthStatus: template.workAuthStatus,
-        yearsExperience: template.yearsExperience,
-        currentLocation: template.currentLocation,
-        country: template.additionalFields?.country || null,
-        jobTitle: jobInfo.jobTitle,
-        companyName: jobInfo.companyName,
-        jobLocation: jobInfo.location,
-      };
+    // Step 2: Mandatory custom / remaining fields — AI + dropdown option hydration, with retries
+    const userContext = {
+      fullName: template.fullName,
+      email: template.email,
+      phone: template.phone,
+      linkedinUrl: template.linkedinUrl,
+      portfolioUrl: template.portfolioUrl,
+      coverLetter: template.coverLetter,
+      workAuthStatus: template.workAuthStatus,
+      yearsExperience: template.yearsExperience,
+      currentLocation: template.currentLocation,
+      country: template.additionalFields?.country || null,
+      jobTitle: jobInfo.jobTitle,
+      companyName: jobInfo.companyName,
+      jobLocation: jobInfo.location,
+    };
+
+    const AI_FILL_MAX_PASSES = 3;
+    for (let pass = 0; pass < AI_FILL_MAX_PASSES; pass++) {
+      console.log(`Checking for unfilled mandatory fields (pass ${pass + 1}/${AI_FILL_MAX_PASSES})...`);
+      const unfilledFields = await extractUnfilledFields(page);
+      if (unfilledFields.length === 0) {
+        if (pass === 0) console.log('All required fields filled by template.');
+        break;
+      }
+
+      console.log(`Found ${unfilledFields.length} unfilled mandatory field(s), enriching dropdowns + AI...`);
+      await enrichReactSelectFieldOptions(page, unfilledFields);
 
       const aiAnswers = await generateFieldAnswers(unfilledFields, userContext);
-      if (aiAnswers.length > 0) {
-        console.log(`AI provided ${aiAnswers.length} answers, filling fields...`);
-        const aiFilledFields = await fillFieldsWithAIAnswers(page, aiAnswers);
-        allFilledFields.push(...aiFilledFields);
-        // Wait for form to settle after AI filling
-        await new Promise((r) => setTimeout(r, 1500));
+      if (aiAnswers.length === 0) {
+        console.warn('AI returned no answers; stopping AI fill passes.');
+        break;
       }
-    } else {
-      console.log('All fields filled by template, no AI needed.');
+
+      console.log(`Applying ${aiAnswers.length} AI answer(s)...`);
+      const aiFilledFields = await fillFieldsWithAIAnswers(page, aiAnswers);
+      allFilledFields.push(...aiFilledFields);
+      await new Promise((r) => setTimeout(r, 1400));
     }
 
     // Deduplicate filled fields (prefer 'template' source over 'ai' for same field name)
@@ -2243,5 +2501,70 @@ export function extractBoardToken(url: string): string | null {
     const m = url.match(p);
     if (m && m[1] !== 'embed') return m[1];
   }
+  return null;
+}
+
+/**
+ * If the user pasted a company careers URL, fetch the page and find an embedded
+ * Greenhouse board URL / board token. Returns a URL that extractBoardToken accepts.
+ */
+export async function resolveGreenhouseBoardInputUrl(
+  inputUrl: string
+): Promise<string | null> {
+  const trimmed = inputUrl.trim();
+  if (extractBoardToken(trimmed)) return trimmed;
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+  } catch {
+    return null;
+  }
+
+  const validToken = (t: string | undefined): string | null => {
+    if (!t || !/^[\w-]+$/.test(t)) return null;
+    if (['embed', 'js', 'v1', 'assets', 'static'].includes(t)) return null;
+    return t;
+  };
+
+  try {
+    const res = await fetch(trimmed, {
+      redirect: 'follow',
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+
+    const tsMatch = html.match(
+      /https?:\/\/job-boards\.greenhouse\.io\/ts\/([\w-]+)/i
+    );
+    const tsTok = validToken(tsMatch?.[1]);
+    if (tsTok) return `https://job-boards.greenhouse.io/ts/${tsTok}`;
+
+    const jbMatch = html.match(
+      /https?:\/\/job-boards\.greenhouse\.io\/(?!ts\/)([\w-]+)/i
+    );
+    const jbTok = validToken(jbMatch?.[1]);
+    if (jbTok) return `https://job-boards.greenhouse.io/${jbTok}`;
+
+    const boardsMatch = html.match(
+      /https?:\/\/(?:www\.)?boards\.greenhouse\.io\/([\w-]+)/i
+    );
+    const bTok = validToken(boardsMatch?.[1]);
+    if (bTok) return `https://boards.greenhouse.io/${bTok}`;
+
+    const embedM = html.match(
+      /greenhouse\.io\/embed\/[^"'>\s]+[?&]for=([\w-]+)/i
+    );
+    const et = validToken(embedM?.[1]);
+    if (et) return `https://job-boards.greenhouse.io/${et}`;
+  } catch (e) {
+    console.warn('resolveGreenhouseBoardInputUrl:', e);
+  }
+
   return null;
 }

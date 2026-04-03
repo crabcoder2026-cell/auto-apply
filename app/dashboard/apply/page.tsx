@@ -198,19 +198,20 @@ export default function ApplyPage() {
           <div className="space-y-4">
             <div>
               <label htmlFor="jobUrl" className="block text-sm font-medium text-gray-700 mb-2">
-                Greenhouse Job URL *
+                Job or careers page URL *
               </label>
               <input
                 id="jobUrl"
                 type="url"
                 value={jobUrl}
                 onChange={(e) => setJobUrl(e.target.value)}
-                placeholder="https://boards.greenhouse.io/company/jobs/123456"
+                placeholder="https://company.com/careers/job/… or boards.greenhouse.io/…/jobs/…"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 disabled={loading}
               />
               <p className="text-sm text-gray-500 mt-1">
-                Enter the direct link to a Greenhouse job posting
+                Use a direct Greenhouse link or your company&apos;s careers page if it embeds
+                Greenhouse (we open the embedded board when needed).
               </p>
             </div>
 
@@ -274,19 +275,20 @@ export default function ApplyPage() {
 
             <div>
               <label htmlFor="boardUrl" className="block text-sm font-medium text-gray-700 mb-2">
-                Custom Greenhouse board URL (optional)
+                Custom board or careers page URL (optional)
               </label>
               <input
                 id="boardUrl"
                 type="url"
                 value={boardUrl}
                 onChange={(e) => setBoardUrl(e.target.value)}
-                placeholder="https://boards.greenhouse.io/company"
+                placeholder="https://company.com/careers or job-boards.greenhouse.io/…"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 disabled={loading}
               />
               <p className="text-sm text-gray-500 mt-1">
-                Used when no preset is selected — enter any Greenhouse job board URL
+                When no preset is selected: direct Greenhouse board URL, or a careers page
+                that embeds Greenhouse (we resolve the board from the page).
               </p>
             </div>
 

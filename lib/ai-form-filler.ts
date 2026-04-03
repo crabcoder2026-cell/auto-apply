@@ -62,6 +62,73 @@ function parseJsonFromMessageContent(content: string): unknown {
   return JSON.parse(text);
 }
 
+function heuristicFallbackForField(f: FormField): string {
+  if (f.type === 'select' && f.options && f.options.length > 0) {
+    const nonPlaceholder = f.options.find(
+      (o) =>
+        o.trim() &&
+        !/^select|^choose|^please|^pick|^--$/i.test(o.trim()) &&
+        !/^-$/.test(o.trim())
+    );
+    return nonPlaceholder || f.options[0];
+  }
+  if (
+    (f.type === 'radio' || f.type === 'checkbox') &&
+    f.options &&
+    f.options.length > 0
+  ) {
+    const yes = f.options.find((o) =>
+      /^(yes|y|true|agree|accept|i agree)/i.test(o.trim())
+    );
+    if (yes) return yes;
+    return f.options[0];
+  }
+  if (f.type === 'textarea') {
+    return (
+      'I am interested in this role and believe my background is a strong match. ' +
+      'I would welcome the opportunity to contribute to the team.'
+    );
+  }
+  if (f.type === 'text') {
+    return 'See resume and profile for details.';
+  }
+  return 'Yes';
+}
+
+/**
+ * Merge LLM answers with the field list; fill gaps with best-effort heuristics
+ * so every mandatory field gets a value.
+ */
+function mergeAnswersWithFieldsAndHeuristics(
+  fields: FormField[],
+  rawAnswers: unknown
+): AIFieldAnswer[] {
+  const byIndex = new Map<number, string>();
+  const arr = Array.isArray(rawAnswers) ? rawAnswers : [];
+  for (const ans of arr as Array<{ field_index?: number; answer?: string }>) {
+    const fieldIndex = (ans.field_index ?? 0) - 1;
+    if (fieldIndex >= 0 && fieldIndex < fields.length && ans.answer) {
+      byIndex.set(fieldIndex, String(ans.answer).trim());
+    }
+  }
+  const out: AIFieldAnswer[] = [];
+  for (let i = 0; i < fields.length; i++) {
+    let ans = byIndex.get(i);
+    if (!ans || !ans.trim()) {
+      ans = heuristicFallbackForField(fields[i]);
+    }
+    if (!ans || !ans.trim()) continue;
+    const f = fields[i];
+    out.push({
+      label: f.label,
+      answer: ans.trim(),
+      id: f.id,
+      name: f.name,
+    });
+  }
+  return out;
+}
+
 /**
  * Call the LLM API to generate answers for unfilled form fields.
  */
@@ -132,7 +199,8 @@ export async function generateFieldAnswers(
   const systemPrompt = `You are an AI assistant that helps fill out job application forms. Your goal is to maximize the applicant's chances of getting an interview. You will be given a list of MANDATORY form fields that need to be filled out, along with the applicant's profile and the job they're applying for.
 
 CRITICAL RULES:
-- For select/dropdown fields, you MUST pick EXACTLY one of the provided options. Return the option text EXACTLY as shown - character for character.
+- You MUST return exactly one answer for EVERY field listed (same count as the numbered fields). Do not skip any index.
+- For select/dropdown fields, you MUST pick EXACTLY one of the provided options when options are listed. Return the option text EXACTLY as shown - character for character. If the list says "(Searchable dropdown)" and no static options were captured, infer the best short answer that would match a typical menu entry (e.g. "Yes", "United States", a job title, or a skill).
 - For YES/NO dropdown or radio questions: ALWAYS pick "Yes" unless it would be dishonest based on the applicant's profile (e.g., if they need sponsorship, don't say "Yes" to "Are you authorized to work without sponsorship").
 - For COUNTRY CODE fields (phone country code, dialing code): Always pick "United States (+1)" or the option containing "United States" and "+1". If the exact text differs, pick whichever option includes both "United States" and "+1".
 - ${phoneRule}
@@ -234,28 +302,11 @@ Respond with raw JSON only. Do not include code blocks, markdown, or any other f
       return [];
     }
 
-    const answers: AIFieldAnswer[] = [];
-
-    if (parsed.answers && Array.isArray(parsed.answers)) {
-      for (const ans of parsed.answers as Array<{
-        field_index?: number;
-        answer?: string;
-      }>) {
-        const fieldIndex = (ans.field_index ?? 0) - 1;
-        if (fieldIndex >= 0 && fieldIndex < fields.length && ans.answer) {
-          const field = fields[fieldIndex];
-          answers.push({
-            label: field.label,
-            answer: String(ans.answer),
-            id: field.id,
-            name: field.name,
-          });
-        }
-      }
-    }
-
-    console.log(`AI generated answers for ${answers.length}/${fields.length} fields`);
-    return answers;
+    const merged = mergeAnswersWithFieldsAndHeuristics(fields, parsed.answers);
+    console.log(
+      `AI generated answers for ${merged.length}/${fields.length} fields (after merge/heuristics)`
+    );
+    return merged;
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('Error calling AI for form filling:', msg);
