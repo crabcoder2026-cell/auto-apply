@@ -41,6 +41,19 @@ Resumes are stored on disk under **`uploads/`** when using local storage mode (d
 
 6. Open [http://localhost:3000](http://localhost:3000), sign up or use the seeded account, configure **Template**, upload a resume, then use **Apply**.
 
+## Auto Search (curated job feed)
+
+The **Auto Search** tab reads a shared cache in `data/store.json` (`jobFeedCache`). The cache is built with **headless Chrome**: each board URL is opened and job links are scraped from the HTML (not the Greenhouse public API). You need a working Chrome/Chromium path (see **Browser modes** below).
+
+Populate the cache by calling the cron endpoint locally (requires `CRON_SECRET` in `.env.local`):
+
+```bash
+curl -sS -H "Authorization: Bearer $CRON_SECRET" \
+  "http://localhost:3000/api/cron/job-feed"
+```
+
+On a VPS or EC2, use the same `curl` with your public `NEXTAUTH_URL` on a **systemd timer** or **crontab** every 30 minutes. Full directory scrapes can take several minutes; self-hosted Node is more reliable than short-lived serverless for this job.
+
 ## Storage modes
 
 - **Local disk** (default): resumes under `uploads/`; metadata in `data/store.json`.

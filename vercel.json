@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/watch",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/job-feed",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

@@ -48,6 +48,28 @@ export interface JsonApplicationHistory {
   applicationData: unknown | null;
 }
 
+/** Aggregated Greenhouse listings for Auto Search (refreshed by cron) */
+export interface CachedJobRow {
+  boardId: string;
+  boardToken: string;
+  boardDisplayName: string;
+  category: string;
+  companyName: string;
+  jobId: number;
+  title: string;
+  location: string | null;
+  department: string | null;
+  jobUrl: string;
+}
+
+export interface JobFeedCache {
+  updatedAt: string;
+  boardsScanned: number;
+  boardsFailed: number;
+  boardErrors: { boardId: string; message: string }[];
+  jobs: CachedJobRow[];
+}
+
 /** Auto pilot / watch: preset boards + filters, dedupe by boardToken:jobId */
 export interface WatchConfig {
   userId: string;
@@ -68,6 +90,7 @@ interface Store {
   templates: JsonApplicationTemplate[];
   applicationHistory: JsonApplicationHistory[];
   watchConfigs: WatchConfig[];
+  jobFeedCache: JobFeedCache | null;
 }
 
 function readStoreSync(): Store {
@@ -78,6 +101,7 @@ function readStoreSync(): Store {
       templates: [],
       applicationHistory: [],
       watchConfigs: [],
+      jobFeedCache: null,
     };
     fs.writeFileSync(STORE_FILE, JSON.stringify(empty, null, 2), 'utf-8');
     return empty;
@@ -85,6 +109,7 @@ function readStoreSync(): Store {
   const raw = fs.readFileSync(STORE_FILE, 'utf-8');
   const parsed = JSON.parse(raw) as Store;
   if (!parsed.watchConfigs) parsed.watchConfigs = [];
+  if (parsed.jobFeedCache === undefined) parsed.jobFeedCache = null;
   return parsed;
 }
 
@@ -382,4 +407,17 @@ export async function listEnabledWatchConfigs(): Promise<WatchConfig[]> {
   const store = readStoreSync();
   if (!store.watchConfigs) return [];
   return store.watchConfigs.filter((w) => w.enabled);
+}
+
+export function getJobFeedCacheSync(): JobFeedCache | null {
+  const store = readStoreSync();
+  return store.jobFeedCache ?? null;
+}
+
+export async function setJobFeedCache(cache: JobFeedCache): Promise<void> {
+  return queueWrite(() => {
+    const store = readStoreSync();
+    store.jobFeedCache = cache;
+    writeStoreSync(store);
+  });
 }

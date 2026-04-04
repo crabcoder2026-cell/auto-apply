@@ -100,7 +100,7 @@ function detectSystemChromePath(): string | null {
  * Local: CHROME_PATH / PUPPETEER_EXECUTABLE_PATH, or auto-detect Chrome in default paths.
  * Serverless: set USE_SPARTICUZ_CHROMIUM=true or run on AWS Lambda (AWS_LAMBDA_FUNCTION_NAME).
  */
-async function launchBrowser(): Promise<Browser> {
+export async function launchBrowser(): Promise<Browser> {
   const fromEnv =
     process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH;
   const localChrome = fromEnv || detectSystemChromePath();
