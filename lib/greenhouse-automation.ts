@@ -1364,7 +1364,7 @@ async function fillFieldsWithAIAnswers(page: Page, answers: AIFieldAnswer[]): Pr
   const actuallyFilled: FilledField[] = [];
 
   for (const answer of answers) {
-    if (!answer.answer || answer.answer === 'N/A') continue;
+    if (!answer.answer || !String(answer.answer).trim()) continue;
 
     try {
       // Step 1: Find the target element's selector and type using page.evaluate

@@ -62,6 +62,38 @@ function parseJsonFromMessageContent(content: string): unknown {
   return JSON.parse(text);
 }
 
+function normalizeFieldLabel(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\s*\*\s*$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const ADDRESS_DECLINE_PHRASE = 'I do not wish to answer';
+
+function isMailingOrPhysicalAddressQuestion(label: string): boolean {
+  const n = normalizeFieldLabel(label);
+  if (!n) return false;
+  return (
+    /full\s+physical\s+mailing\s+address/.test(n) ||
+    /physical\s+mailing\s+address/.test(n) ||
+    /mailing\s+address/.test(n) ||
+    /full\s+address/.test(n) ||
+    /street.*city.*state/.test(n) ||
+    /home\s+address/.test(n) ||
+    /residential\s+address/.test(n) ||
+    /where\s+to\s+send/.test(n) ||
+    /complete\s+address/.test(n) ||
+    (/\baddress\b/.test(n) &&
+      (/\bline\s*1\b/.test(n) ||
+        /\bstreet\b/.test(n) ||
+        /\bapt\b/.test(n) ||
+        /\bzip\b/.test(n) ||
+        /\bpostal\b/.test(n)))
+  );
+}
+
 function heuristicFallbackForField(f: FormField): string {
   if (f.type === 'select' && f.options && f.options.length > 0) {
     const nonPlaceholder = f.options.find(
@@ -83,14 +115,10 @@ function heuristicFallbackForField(f: FormField): string {
     if (yes) return yes;
     return f.options[0];
   }
-  if (f.type === 'textarea') {
-    return (
-      'I am interested in this role and believe my background is a strong match. ' +
-      'I would welcome the opportunity to contribute to the team.'
-    );
-  }
-  if (f.type === 'text') {
-    return 'See resume and profile for details.';
+  /** Free-text: required fields must not stay empty */
+  if (f.type === 'textarea' || f.type === 'text') {
+    if (isMailingOrPhysicalAddressQuestion(f.label)) return ADDRESS_DECLINE_PHRASE;
+    return 'N/A';
   }
   return 'Yes';
 }
@@ -105,20 +133,60 @@ function mergeAnswersWithFieldsAndHeuristics(
 ): AIFieldAnswer[] {
   const byIndex = new Map<number, string>();
   const arr = Array.isArray(rawAnswers) ? rawAnswers : [];
-  for (const ans of arr as Array<{ field_index?: number; answer?: string }>) {
+
+  type Raw = { field_index?: number; answer?: string; label?: string };
+  for (const ans of arr as Raw[]) {
+    const a = ans.answer != null ? String(ans.answer).trim() : '';
+    if (!a) continue;
     const fieldIndex = (ans.field_index ?? 0) - 1;
-    if (fieldIndex >= 0 && fieldIndex < fields.length && ans.answer) {
-      byIndex.set(fieldIndex, String(ans.answer).trim());
+    if (fieldIndex >= 0 && fieldIndex < fields.length) {
+      byIndex.set(fieldIndex, a);
     }
   }
+
+  // Second pass: map by label when indices are wrong or missing (common with long forms)
+  for (let i = 0; i < fields.length; i++) {
+    if (byIndex.get(i)?.trim()) continue;
+    const want = normalizeFieldLabel(fields[i].label);
+    if (!want) continue;
+    for (const ans of arr as Raw[]) {
+      const a = ans.answer != null ? String(ans.answer).trim() : '';
+      if (!a || !ans.label) continue;
+      const got = normalizeFieldLabel(ans.label);
+      if (!got) continue;
+      if (
+        got === want ||
+        want.includes(got) ||
+        got.includes(want) ||
+        want.slice(0, 40) === got.slice(0, 40)
+      ) {
+        byIndex.set(i, a);
+        break;
+      }
+    }
+  }
+
   const out: AIFieldAnswer[] = [];
   for (let i = 0; i < fields.length; i++) {
+    const f = fields[i];
     let ans = byIndex.get(i);
     if (!ans || !ans.trim()) {
-      ans = heuristicFallbackForField(fields[i]);
+      ans = heuristicFallbackForField(f);
+    }
+    const trimmed = (ans || '').trim();
+    const na = /^n\/a$/i.test(trimmed);
+    if (
+      na &&
+      (f.type === 'select' || f.type === 'radio' || f.type === 'checkbox')
+    ) {
+      ans = heuristicFallbackForField(f);
+    } else if (
+      (f.type === 'textarea' || f.type === 'text') &&
+      isMailingOrPhysicalAddressQuestion(f.label)
+    ) {
+      ans = ADDRESS_DECLINE_PHRASE;
     }
     if (!ans || !ans.trim()) continue;
-    const f = fields[i];
     out.push({
       label: f.label,
       answer: ans.trim(),
@@ -199,21 +267,20 @@ export async function generateFieldAnswers(
   const systemPrompt = `You are an AI assistant that helps fill out job application forms. Your goal is to maximize the applicant's chances of getting an interview. You will be given a list of MANDATORY form fields that need to be filled out, along with the applicant's profile and the job they're applying for.
 
 CRITICAL RULES:
-- You MUST return exactly one answer for EVERY field listed (same count as the numbered fields). Do not skip any index.
-- For select/dropdown fields, you MUST pick EXACTLY one of the provided options when options are listed. Return the option text EXACTLY as shown - character for character. If the list says "(Searchable dropdown)" and no static options were captured, infer the best short answer that would match a typical menu entry (e.g. "Yes", "United States", a job title, or a skill).
+- You MUST return exactly one JSON entry in "answers" for EVERY numbered field (field_index 1 through ${fields.length}). Never omit an index. Never use null or empty string for "answer".
+- For select/dropdown fields, you MUST pick EXACTLY one of the provided options when options are listed. Return the option text EXACTLY as shown - character for character. If the list says "(Searchable dropdown)" and no static options were captured, infer the best short answer that would match a typical menu entry (e.g. "Yes", "United States", a job title, or a skill). Do NOT use "N/A" for select/radio/checkbox.
 - For YES/NO dropdown or radio questions: ALWAYS pick "Yes" unless it would be dishonest based on the applicant's profile (e.g., if they need sponsorship, don't say "Yes" to "Are you authorized to work without sponsorship").
 - For COUNTRY CODE fields (phone country code, dialing code): Always pick "United States (+1)" or the option containing "United States" and "+1". If the exact text differs, pick whichever option includes both "United States" and "+1".
 - ${phoneRule}
 - For COUNTRY fields (country of residence, nationality): Pick the option that matches the applicant's country from their profile.
+- For MAILING ADDRESS / PHYSICAL ADDRESS questions (e.g. "Full physical mailing address", "Street, City and State", "home address", "where to send mail", "complete address", "residential address"): For free-text fields, answer EXACTLY this phrase with no changes: I do not wish to answer. Do not paste the applicant's real address for these. If the field is a dropdown and that exact text is not an option, pick the closest option such as "Prefer not to answer" or "Decline to answer" if available; otherwise N/A is not allowed for selects—pick the most neutral non-specific option.
 - For radio/checkbox fields with options, pick the most interview-friendly option text exactly as shown.
-- For text fields, provide a concise, professional answer that makes the applicant look strong.
-- For textarea fields, provide an enthusiastic, well-written response (2-4 sentences max) that highlights fit for the role.
+- For other TEXT and TEXTAREA (free-text) fields: Use the applicant profile when possible (e.g. city/location for non-mailing questions; experience questions → short honest answer grounded in profile). If the profile does NOT contain the information and you cannot answer truthfully, you MUST still submit the literal text N/A (not blank). Never skip these fields.
 - If a field asks about salary expectations, say "Open to discussion" or "Competitive" or pick a reasonable option.
-- If a field asks about willingness to relocate, commute, travel, start date, etc., answer positively (Yes, Immediately, Flexible, etc.).
+- If a field asks about willingness to relocate, commute, travel, start date, etc., answer positively (Yes, Immediately, Flexible, etc.) when honest.
 - For fields about how they heard about the position, say "Job Board" or "Company Website" or pick the first reasonable option.
 - For gender/demographics/EEO questions: select "Decline to self-identify" or "Prefer not to say" if available. If not available, pick any option.
 - For disability or veteran status: select "Decline" or "Prefer not to answer" if available.
-- NEVER return "N/A" or empty answers. Always provide a real answer for every field. If unsure, make a reasonable professional choice.
 - When in doubt on any dropdown, pick "Yes" if it's an option, otherwise pick the first non-placeholder option.
 
 Respond with raw JSON only. Do not include code blocks, markdown, or any other formatting.`;
@@ -224,13 +291,13 @@ ${userProfile}
 ${jobContext ? `Job being applied for:\n${jobContext}\n\n` : ''}The following form fields need to be filled out:
 ${fieldsDescription}
 
-Please provide answers for each field. Respond in this JSON format:
+Please provide answers for each field. You MUST include exactly ${fields.length} objects in "answers", with field_index 1 through ${fields.length} in order. Each object may also include "label" (copy the field label text) to help validation.
+
+Example shape:
 {
   "answers": [
-    {
-      "field_index": 1,
-      "answer": "your answer here"
-    }
+    { "field_index": 1, "label": "...", "answer": "..." },
+    { "field_index": 2, "label": "...", "answer": "..." }
   ]
 }
 
@@ -259,7 +326,7 @@ Respond with raw JSON only. Do not include code blocks, markdown, or any other f
       body: JSON.stringify({
         model,
         messages,
-        max_tokens: 3000,
+        max_tokens: 6000,
         temperature: 0.3,
         ...extra,
       }),
