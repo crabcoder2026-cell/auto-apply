@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { createApplicationHistory, getActiveTemplate } from '@/lib/json-store';
-import { applyToBatchJobs } from '@/lib/greenhouse-automation';
+import {
+  createApplicationHistory,
+  getActiveTemplate,
+  listApplicationHistory,
+} from '@/lib/json-store';
+import {
+  applyToBatchJobs,
+  BATCH_DEFAULT_MAX_JOBS,
+  normalizeJobUrlForDedupe,
+} from '@/lib/greenhouse-automation';
 import { getPresetBoardById } from '@/lib/preset-boards';
 
 export const dynamic = 'force-dynamic';
@@ -44,15 +52,34 @@ export async function POST(request: Request) {
       department: filters.department || undefined,
     };
 
+    const history = await listApplicationHistory(userId);
+    const appliedJobUrls = new Set(
+      history
+        .filter((h) => h.status === 'success')
+        .map((h) => normalizeJobUrlForDedupe(h.jobUrl))
+        .filter(Boolean)
+    );
+
     const allResults: Awaited<ReturnType<typeof applyToBatchJobs>> = [];
+    let remaining = BATCH_DEFAULT_MAX_JOBS;
 
     for (const id of boardIds) {
       if (typeof id !== 'string') continue;
+      if (remaining <= 0) break;
       const preset = getPresetBoardById(id);
       if (!preset) continue;
 
-      const results = await applyToBatchJobs(preset.url, template, filterObj);
+      const results = await applyToBatchJobs(preset.url, template, filterObj, {
+        appliedJobUrls,
+        maxJobs: remaining,
+      });
       allResults.push(...results);
+
+      for (const r of results) {
+        if (r.jobUrl)
+          appliedJobUrls.add(normalizeJobUrlForDedupe(r.jobUrl));
+      }
+      remaining -= results.filter((r) => Boolean(r.jobUrl)).length;
 
       await Promise.all(
         results.map((result) =>

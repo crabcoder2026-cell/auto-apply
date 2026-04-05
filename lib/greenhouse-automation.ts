@@ -46,6 +46,30 @@ export interface ApplicationResult {
   jobUrl?: string;
 }
 
+/** Default max jobs per dashboard batch apply request */
+export const BATCH_DEFAULT_MAX_JOBS = 50;
+
+/**
+ * Normalize job URLs so history vs API absolute_url match for deduplication.
+ */
+export function normalizeJobUrlForDedupe(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  try {
+    const u = new URL(trimmed);
+    u.hash = '';
+    let host = u.hostname.toLowerCase().replace(/^www\./, '');
+    const proto =
+      host.endsWith('greenhouse.io') && u.protocol === 'http:'
+        ? 'https:'
+        : u.protocol;
+    const path = u.pathname.replace(/\/+$/, '') || '/';
+    return `${proto}//${host}${path}${u.search}`;
+  } catch {
+    return trimmed.toLowerCase().replace(/\/+$/, '');
+  }
+}
+
 /**
  * Try common install locations when CHROME_PATH is unset (local dev).
  */
@@ -2427,7 +2451,9 @@ export async function applyToBatchJobs(
   options?: {
     /** Skip jobs already in this set (keys: `${boardToken}:${jobId}`) */
     dedupeKeys?: Set<string>;
-    /** Max jobs to apply this run (default 10) */
+    /** Skip jobs whose URL (normalized) is in this set (e.g. prior successful applies) */
+    appliedJobUrls?: Set<string>;
+    /** Max jobs to apply this run */
     maxJobs?: number;
   }
 ): Promise<ApplicationResult[]> {
@@ -2499,7 +2525,29 @@ export async function applyToBatchJobs(
       });
     }
 
-    const maxJobs = options?.maxJobs ?? 10;
+    if (options?.appliedJobUrls && options.appliedJobUrls.size > 0) {
+      const applied = options.appliedJobUrls;
+      const before = filteredJobs.length;
+      filteredJobs = filteredJobs.filter((j) => {
+        const jobUrl =
+          j.absolute_url ||
+          `https://boards.greenhouse.io/${boardToken}/jobs/${j.id}`;
+        const key = normalizeJobUrlForDedupe(jobUrl);
+        return !key || !applied.has(key);
+      });
+      if (before !== filteredJobs.length) {
+        console.log(
+          `Skipped ${before - filteredJobs.length} job(s) already applied (URL match)`
+        );
+      }
+    }
+
+    if (filteredJobs.length === 0) {
+      console.log('No jobs to apply after filters and deduplication');
+      return [];
+    }
+
+    const maxJobs = options?.maxJobs ?? BATCH_DEFAULT_MAX_JOBS;
     const limitedJobs = filteredJobs.slice(0, maxJobs);
     console.log(
       `Found ${filteredJobs.length} matching jobs, applying to ${limitedJobs.length}`

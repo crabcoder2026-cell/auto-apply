@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { createApplicationHistory, getActiveTemplate } from '@/lib/json-store';
+import {
+  createApplicationHistory,
+  getActiveTemplate,
+  listApplicationHistory,
+} from '@/lib/json-store';
 import {
   applyToBatchJobs,
+  BATCH_DEFAULT_MAX_JOBS,
   isValidJobPageUrl,
+  normalizeJobUrlForDedupe,
   resolveGreenhouseBoardInputUrl,
 } from '@/lib/greenhouse-automation';
 
@@ -60,7 +66,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const results = await applyToBatchJobs(resolvedBoardUrl, template, filters);
+    const history = await listApplicationHistory(userId);
+    const appliedJobUrls = new Set(
+      history
+        .filter((h) => h.status === 'success')
+        .map((h) => normalizeJobUrlForDedupe(h.jobUrl))
+        .filter(Boolean)
+    );
+
+    const results = await applyToBatchJobs(resolvedBoardUrl, template, filters, {
+      appliedJobUrls,
+      maxJobs: BATCH_DEFAULT_MAX_JOBS,
+    });
 
     const historyPromises = results.map((result) =>
       createApplicationHistory({

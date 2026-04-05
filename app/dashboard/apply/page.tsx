@@ -341,8 +341,10 @@ export default function ApplyPage() {
 
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Each board run is limited to 10 jobs per request. Auto pilot
-                uses fewer per board per run so scheduled runs stay within hosting timeouts.
+                <strong>Note:</strong> Each board run applies up to 50 jobs per request (skipping
+                any job URL you already applied to successfully). Preset batch runs share that 50-job
+                budget across selected boards. Auto pilot uses fewer per board per run so scheduled
+                runs stay within hosting timeouts.
               </p>
             </div>
 
