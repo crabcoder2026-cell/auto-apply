@@ -10,7 +10,7 @@ Use one of these patterns.
 
 ### Recommended: use the repo `ecosystem.config.cjs`
 
-This file uses **dotenv** to read **`.env.production`** in the project root and passes those variables into the Next.js process.
+The **`ecosystem.config.cjs`** in this repo starts **Next directly with Node** and **`node -r dotenv/config`**, with **`DOTENV_CONFIG_PATH`** pointing at **`.env.production`**. That loads every variable from the file into `process.env` *before* `next start` runs (the old `npm`-based PM2 start often failed to pass secrets through to the Next process).
 
 1. On EC2, create **`/home/ec2-user/auto-apply/.env.production`** with real values (file is often not in git). Include at least:
 
@@ -39,6 +39,22 @@ Run the `sudo env PATH=... pm2 startup ...` command PM2 prints so it survives re
 ```bash
 pm2 restart auto-apply --update-env
 ```
+
+If the key still does not apply, **fully recreate** the process (PM2 can keep a stale environment):
+
+```bash
+pm2 delete auto-apply
+pm2 start ecosystem.config.cjs
+pm2 save
+```
+
+**Check the file format:** one line, no spaces around `=`, value without spaces unless quoted:
+
+```bash
+OPENAI_API_KEY=sk-proj-...
+```
+
+Run `grep OPENAI_API_KEY .env.production` on EC2 — the line must not be commented out (`#`).
 
 Useful commands:
 
