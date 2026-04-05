@@ -1571,6 +1571,21 @@ async function fillFieldsWithAIAnswers(page: Page, answers: AIFieldAnswer[]): Pr
 async function detectSecurityCodeScreen(page: Page): Promise<boolean> {
   return page.evaluate(() => {
     const bodyText = (document.body.textContent || '').toLowerCase();
+    // If we already reached a thank-you / confirmation state, do not treat as code screen
+    // (avoids false positives from job copy containing words like "verification")
+    const successHints = [
+      'thank you',
+      'thanks for applying',
+      'application submitted',
+      'received your application',
+      'application complete',
+      'your application has been submitted',
+      'successfully applied',
+    ];
+    if (successHints.some((h) => bodyText.includes(h))) {
+      return false;
+    }
+
     const securityIndicators = [
       'security code',
       'verification code',
@@ -1682,13 +1697,34 @@ async function handleSecurityCodeVerification(
 
   if (visibleSingleChars.length >= code.length) {
     console.log(`[SecurityCode] Found ${visibleSingleChars.length} single-char inputs, typing one char each...`);
+    // Sort by visual position (LTR / top-to-bottom). Greenhouse often uses flex/grid so DOM order ≠ display order.
+    const withBoxes = await Promise.all(
+      visibleSingleChars.map(async (handle) => {
+        const box = await handle.boundingBox();
+        return { handle, box };
+      })
+    );
+    withBoxes.sort((a, b) => {
+      if (!a.box || !b.box) return 0;
+      if (Math.abs(a.box.y - b.box.y) > 10) return a.box.y - b.box.y;
+      return a.box.x - b.box.x;
+    });
+    const sortedHandles = withBoxes.map((x) => x.handle);
     for (let i = 0; i < code.length; i++) {
-      await visibleSingleChars[i].click();
-      await visibleSingleChars[i].type(code[i], { delay: 30 });
-      await new Promise((r) => setTimeout(r, 100));
+      await sortedHandles[i].click();
+      await sortedHandles[i].type(code[i], { delay: 40 });
+      await new Promise((r) => setTimeout(r, 90));
     }
     codeEntered = true;
-    console.log('[SecurityCode] Entered code via single-char inputs');
+    console.log('[SecurityCode] Entered code via single-char inputs (visual order)');
+    try {
+      await sortedHandles[code.length - 1].evaluate((el: Element) =>
+        (el as HTMLElement).blur()
+      );
+      await new Promise((r) => setTimeout(r, 400));
+    } catch {
+      /* ignore */
+    }
   }
 
   if (!codeEntered) {
@@ -1770,47 +1806,79 @@ async function handleSecurityCodeVerification(
     return { handled: false, code };
   }
 
-  // Wait a moment for any client-side validation
+  // Wait a moment for any client-side validation (React state)
   await new Promise((r) => setTimeout(r, 1500));
 
-  // Step 2: Click the submit/resubmit button
-  // Greenhouse says "resubmit your application" so we need the main submit button
+  // Step 2: Click the submit/resubmit button — use Puppeteer click after tagging (more reliable than evaluate.click for React)
   console.log('[SecurityCode] Looking for submit/verify button...');
-  
+
   const clickedButton = await page.evaluate(() => {
-    const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a[role="button"]'));
-    
-    // Priority order: submit application > verify > submit > continue > confirm
+    const buttons = Array.from(
+      document.querySelectorAll('button, input[type="submit"], a[role="button"]')
+    );
+
     const priorities = [
-      (text: string, value: string) => text.includes('submit application') || value.includes('submit application'),
-      (text: string, value: string) => text.includes('submit your application') || value.includes('submit'),
-      (text: string, value: string) => text.includes('verify') || value.includes('verify'),
-      (text: string, value: string) => text.includes('submit') || value.includes('submit'),
-      (text: string, value: string) => text.includes('continue') || value.includes('continue'),
-      (text: string, value: string) => text.includes('confirm') || value.includes('confirm'),
+      (text: string, value: string) =>
+        text.includes('resubmit') || value.includes('resubmit'),
+      (text: string, value: string) =>
+        text.includes('submit application') || value.includes('submit application'),
+      (text: string, value: string) =>
+        text.includes('submit your application') || value.includes('submit'),
+      (text: string, value: string) =>
+        text.includes('verify email') || text.includes('verify code'),
+      (text: string, value: string) =>
+        text.includes('verify') || value.includes('verify'),
+      (text: string, value: string) =>
+        text.includes('submit') || value.includes('submit'),
+      (text: string, value: string) =>
+        text.includes('continue') || value.includes('continue'),
+      (text: string, value: string) =>
+        text.includes('confirm') || value.includes('confirm'),
     ];
 
     for (const priority of priorities) {
       for (const btn of buttons) {
         const text = (btn.textContent || '').toLowerCase().trim();
         const value = (btn as HTMLInputElement).value?.toLowerCase() || '';
-        if (priority(text, value)) {
-          if ((btn as HTMLElement).offsetWidth && (btn as HTMLElement).offsetHeight) {
-            console.log(`[SecurityCode] Clicking button: "${btn.textContent?.trim()}"`);
-            (btn as HTMLElement).click();
-            return btn.textContent?.trim() || 'unknown';
-          }
-        }
+        if (!priority(text, value)) continue;
+        const el = btn as HTMLElement;
+        if (!el.offsetWidth || !el.offsetHeight) continue;
+        el.setAttribute('data-gh-auto-verify-submit', '1');
+        return btn.textContent?.trim() || value || 'unknown';
       }
     }
     return null;
   });
 
-  if (clickedButton) {
-    console.log(`[SecurityCode] Clicked button: "${clickedButton}"`);
-  } else {
-    // Fallback: try clicking submit button using the same logic as main submission
-    console.log('[SecurityCode] No button found via evaluate, trying clickSubmitButton...');
+  let verifySubmitClicked = false;
+  const submitHandle = await page.$('[data-gh-auto-verify-submit="1"]');
+  if (submitHandle) {
+    try {
+      await submitHandle.click({ delay: 80 });
+      verifySubmitClicked = true;
+      console.log(
+        `[SecurityCode] Clicked button (Puppeteer): "${clickedButton || 'verify-submit'}"`
+      );
+    } catch (e) {
+      console.log('[SecurityCode] Puppeteer click failed, trying DOM click:', e);
+      await page.evaluate(() => {
+        document.querySelector('[data-gh-auto-verify-submit="1"]')?.dispatchEvent(
+          new MouseEvent('click', { bubbles: true, cancelable: true, view: window })
+        );
+      });
+      verifySubmitClicked = true;
+    }
+    try {
+      await submitHandle.evaluate((el) =>
+        el.removeAttribute('data-gh-auto-verify-submit')
+      );
+    } catch {
+      /* element may have detached after navigation */
+    }
+  }
+
+  if (!verifySubmitClicked) {
+    console.log('[SecurityCode] No tagged button, trying clickSubmitButton...');
     const submitted = await clickSubmitButton(page);
     if (!submitted) {
       console.log('[SecurityCode] Trying Enter key as last resort...');
@@ -1818,12 +1886,17 @@ async function handleSecurityCodeVerification(
     }
   }
 
-  // Step 3: Wait for the page to process the submission
+  // Step 3: Wait for network + SPA update (Greenhouse is slow to show thank-you)
   console.log('[SecurityCode] Waiting for submission to process...');
-  await new Promise((r) => setTimeout(r, 5000));
+  await page.waitForNetworkIdle({ idleTime: 800, timeout: 25000 }).catch(() => {});
+  await new Promise((r) => setTimeout(r, 4000));
 
-  // Step 4: Check if we succeeded
-  const successAfterCode = await checkSubmissionSuccess(page);
+  // Step 4: Check if we succeeded (poll twice — confirmation text can appear late)
+  let successAfterCode = await checkSubmissionSuccess(page);
+  if (!successAfterCode) {
+    await new Promise((r) => setTimeout(r, 5000));
+    successAfterCode = await checkSubmissionSuccess(page);
+  }
   if (successAfterCode) {
     console.log('[SecurityCode] Application submitted successfully after entering security code!');
     return { handled: true, code };
@@ -1926,12 +1999,17 @@ async function checkSubmissionSuccess(page: Page): Promise<boolean> {
     const successIndicators = [
       'thank you',
       'thanks for applying',
+      'thank you for applying',
       'application submitted',
       'successfully applied',
       'application has been received',
       'we have received your application',
+      'received your application',
       'application complete',
       'your application has been submitted',
+      'we\'ve received your application',
+      'you applied',
+      'application was submitted',
     ];
     const bodyLower = bodyText.toLowerCase();
     return successIndicators.some((indicator) => bodyLower.includes(indicator));
