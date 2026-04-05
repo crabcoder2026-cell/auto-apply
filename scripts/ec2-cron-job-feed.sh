@@ -10,6 +10,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/ec2-cron-common.sh"
+
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEFAULT_ENV="$REPO_ROOT/.env.production"
 ENV_FILE="${1:-${CRON_ENV_FILE:-$DEFAULT_ENV}}"
@@ -20,19 +23,8 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
-
-if [[ -z "${CRON_SECRET:-}" ]]; then
-  echo "ec2-cron-job-feed: CRON_SECRET is empty in $ENV_FILE" >&2
-  exit 1
-fi
-if [[ -z "${NEXTAUTH_URL:-}" ]]; then
-  echo "ec2-cron-job-feed: NEXTAUTH_URL is empty in $ENV_FILE" >&2
-  exit 1
-fi
+ec2_cron_source_env "$ENV_FILE"
+ec2_cron_check_secrets "$ENV_FILE"
 
 BASE="${NEXTAUTH_URL%/}"
 curl -sS -f -H "Authorization: Bearer ${CRON_SECRET}" "${BASE}/api/cron/job-feed"

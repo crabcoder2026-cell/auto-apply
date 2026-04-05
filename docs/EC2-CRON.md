@@ -2,6 +2,18 @@
 
 Your Next.js app does not wake itself. On EC2 you schedule HTTP calls to the protected cron routes using the same **`CRON_SECRET`** and **`NEXTAUTH_URL`** as the running server.
 
+The app must stay running after you close SSH — use **PM2** or **systemd** ([EC2-KEEP-SERVER-UP.md](./EC2-KEEP-SERVER-UP.md)).
+
+### Quick fix: `CRON_SECRET is empty` in cron scripts
+
+Cron reads **`.env.production`** (not your SSH session). Add variables with:
+
+```bash
+export CRON_SECRET='same-as-nextjs'
+export NEXTAUTH_URL='https://your-domain.com'
+./scripts/ec2-set-cron-env.sh
+```
+
 ## 1. Env file on the server
 
 Use the **same** values as your production app (e.g. `.env.production` next to the app, or a small file only for cron).
@@ -39,8 +51,29 @@ If the app lives in `/home/ubuntu/auto-apply`, you can instead use `/home/ubuntu
 After `git pull`, from the repo root:
 
 ```bash
-chmod +x scripts/ec2-cron-watch.sh scripts/ec2-cron-job-feed.sh
+chmod +x scripts/ec2-cron-common.sh scripts/ec2-cron-watch.sh scripts/ec2-cron-job-feed.sh
 ```
+
+### `CRON_SECRET is empty` on EC2
+
+The cron scripts read **`CRON_SECRET` and `NEXTAUTH_URL` from the env file you pass** (default: `.env.production` in the repo). They do **not** read systemd/pm2’s environment.
+
+1. **Add the line to that file** on the server (same secret the app uses):
+
+   ```bash
+   nano /home/ec2-user/auto-apply/.env.production
+   ```
+
+   Ensure you have exactly (no spaces around `=`):
+
+   ```bash
+   CRON_SECRET=your-long-random-secret-here
+   NEXTAUTH_URL=https://your-public-domain.com
+   ```
+
+2. **Match the running app:** whatever starts Next (`systemd`, `pm2`, etc.) must also set **`CRON_SECRET`** to the same string (often by loading the same `.env.production` or `EnvironmentFile=`).
+
+3. If you edited the file on Windows, CRLF was breaking variable names; the scripts now strip `\r`, but you should still save `CRON_SECRET=` on its own line.
 
 ## 3. Test manually (on EC2)
 
