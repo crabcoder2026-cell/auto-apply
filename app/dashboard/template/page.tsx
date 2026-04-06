@@ -235,13 +235,13 @@ export default function TemplatePage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="bg-white rounded-xl shadow-md p-8">
+      <div className="bg-card rounded-xl shadow-md p-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+          <h1 className="text-2xl font-bold text-foreground flex items-center">
             <FileText className="h-7 w-7 mr-2 text-brand-green" />
             Application Template
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-muted-foreground mt-2">
             Save your application details once and use them for all job applications
           </p>
         </div>
@@ -262,13 +262,13 @@ export default function TemplatePage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Resume Upload */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Resume (PDF or DOCX) *
             </label>
             <div className="flex items-center space-x-4">
               <label className="flex-1 cursor-pointer">
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-brand-orange/50 transition-colors">
-                  <div className="flex items-center justify-center space-x-2 text-gray-600">
+                <div className="border-2 border-dashed border-input rounded-lg p-6 hover:border-brand-orange/50 transition-colors">
+                  <div className="flex items-center justify-center space-x-2 text-muted-foreground">
                     {uploading ? (
                       <>
                         <Loader2 className="h-5 w-5 animate-spin" />
@@ -303,7 +303,7 @@ export default function TemplatePage() {
           {/* Personal Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="fullName" className="block text-sm font-medium text-foreground mb-2">
                 Full Name *
               </label>
               <input
@@ -312,13 +312,13 @@ export default function TemplatePage() {
                 required
                 value={formData.fullName}
                 onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 placeholder="John Doe"
               />
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
                 Email Address *
               </label>
               <input
@@ -327,13 +327,13 @@ export default function TemplatePage() {
                 required
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 placeholder="john@example.com"
               />
             </div>
 
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="phone" className="block text-sm font-medium text-foreground mb-2">
                 Phone Number
               </label>
               <input
@@ -341,13 +341,13 @@ export default function TemplatePage() {
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 placeholder="+1 (555) 123-4567"
               />
             </div>
 
             <div>
-              <label htmlFor="currentLocation" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="currentLocation" className="block text-sm font-medium text-foreground mb-2">
                 Location (City) *
               </label>
               <input
@@ -356,21 +356,21 @@ export default function TemplatePage() {
                 required
                 value={formData.currentLocation}
                 onChange={(e) => setFormData({ ...formData, currentLocation: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 placeholder="San Francisco, CA"
               />
-              <p className="text-xs text-gray-500 mt-1">Used for &quot;Location (City)&quot; fields on Greenhouse forms</p>
+              <p className="text-xs text-muted-foreground mt-1">Used for &quot;Location (City)&quot; fields on Greenhouse forms</p>
             </div>
 
             <div>
-              <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="country" className="block text-sm font-medium text-foreground mb-2">
                 Country of Residence *
               </label>
               <select
                 id="country"
                 value={formData.country}
                 onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent bg-white"
+                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent bg-card"
               >
                 <option value="">Select country</option>
                 <option value="United States">United States</option>
@@ -427,7 +427,7 @@ export default function TemplatePage() {
             </div>
 
             <div>
-              <label htmlFor="linkedinUrl" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="linkedinUrl" className="block text-sm font-medium text-foreground mb-2">
                 LinkedIn Profile URL *
               </label>
               <input
@@ -436,14 +436,14 @@ export default function TemplatePage() {
                 required
                 value={formData.linkedinUrl}
                 onChange={(e) => setFormData({ ...formData, linkedinUrl: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 placeholder="https://linkedin.com/in/johndoe"
               />
-              <p className="text-xs text-gray-500 mt-1">Required by most Greenhouse job applications</p>
+              <p className="text-xs text-muted-foreground mt-1">Required by most Greenhouse job applications</p>
             </div>
 
             <div>
-              <label htmlFor="portfolioUrl" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="portfolioUrl" className="block text-sm font-medium text-foreground mb-2">
                 Portfolio/Website URL
               </label>
               <input
@@ -451,20 +451,20 @@ export default function TemplatePage() {
                 type="url"
                 value={formData.portfolioUrl}
                 onChange={(e) => setFormData({ ...formData, portfolioUrl: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 placeholder="https://johndoe.com"
               />
             </div>
 
             <div>
-              <label htmlFor="workAuthStatus" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="workAuthStatus" className="block text-sm font-medium text-foreground mb-2">
                 Work Authorization Status
               </label>
               <select
                 id="workAuthStatus"
                 value={formData.workAuthStatus}
                 onChange={(e) => setFormData({ ...formData, workAuthStatus: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
               >
                 <option value="">Select status</option>
                 <option value="US Citizen">US Citizen</option>
@@ -476,7 +476,7 @@ export default function TemplatePage() {
             </div>
 
             <div>
-              <label htmlFor="yearsExperience" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="yearsExperience" className="block text-sm font-medium text-foreground mb-2">
                 Years of Experience
               </label>
               <input
@@ -486,7 +486,7 @@ export default function TemplatePage() {
                 max="50"
                 value={formData.yearsExperience}
                 onChange={(e) => setFormData({ ...formData, yearsExperience: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 placeholder="5"
               />
             </div>
@@ -494,7 +494,7 @@ export default function TemplatePage() {
 
           {/* Cover Letter */}
           <div>
-            <label htmlFor="coverLetter" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="coverLetter" className="block text-sm font-medium text-foreground mb-2">
               Cover Letter Template
             </label>
             <textarea
@@ -502,18 +502,18 @@ export default function TemplatePage() {
               rows={8}
               value={formData.coverLetter}
               onChange={(e) => setFormData({ ...formData, coverLetter: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+              className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
               placeholder="Write a general cover letter that can be used across applications..."
             />
           </div>
 
           {/* Email IMAP Settings for Security Code Verification */}
-          <div className="border-t border-gray-200 pt-6 mt-6">
+          <div className="border-t border-border pt-6 mt-6">
             <div className="flex items-center mb-4">
               <ShieldCheck className="h-5 w-5 text-brand-green mr-2" />
-              <h2 className="text-lg font-semibold text-gray-900">Email Verification Settings</h2>
+              <h2 className="text-lg font-semibold text-foreground">Email Verification Settings</h2>
             </div>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               Greenhouse may send a security code to your email during application. Configure your email IMAP
               settings below so the app can automatically retrieve and enter the code.
               For Gmail, you need an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" className="text-brand-green underline">App Password</a> (requires 2FA enabled).
@@ -521,7 +521,7 @@ export default function TemplatePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="imapProvider" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="imapProvider" className="block text-sm font-medium text-foreground mb-2">
                   Email Provider
                 </label>
                 <select
@@ -545,7 +545,7 @@ export default function TemplatePage() {
                     });
                     setImapTestResult(null);
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                  className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 >
                   <option value="">Select provider...</option>
                   <option value="gmail">Gmail</option>
@@ -557,7 +557,7 @@ export default function TemplatePage() {
               </div>
 
               <div>
-                <label htmlFor="imapHost" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="imapHost" className="block text-sm font-medium text-foreground mb-2">
                   IMAP Server Host
                 </label>
                 <input
@@ -565,14 +565,14 @@ export default function TemplatePage() {
                   type="text"
                   value={formData.imapHost}
                   onChange={(e) => setFormData({ ...formData, imapHost: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                  className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                   placeholder="imap.gmail.com"
                   readOnly={formData.imapProvider !== 'custom' && formData.imapProvider !== ''}
                 />
               </div>
 
               <div>
-                <label htmlFor="imapPort" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="imapPort" className="block text-sm font-medium text-foreground mb-2">
                   IMAP Port
                 </label>
                 <input
@@ -580,14 +580,14 @@ export default function TemplatePage() {
                   type="number"
                   value={formData.imapPort}
                   onChange={(e) => setFormData({ ...formData, imapPort: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                  className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                   placeholder="993"
                   readOnly={formData.imapProvider !== 'custom' && formData.imapProvider !== ''}
                 />
               </div>
 
               <div>
-                <label htmlFor="imapPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="imapPassword" className="block text-sm font-medium text-foreground mb-2">
                   Email Password / App Password
                 </label>
                 <input
@@ -598,7 +598,7 @@ export default function TemplatePage() {
                     setFormData({ ...formData, imapPassword: e.target.value });
                     setImapTestResult(null);
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                  className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                   placeholder={formData.imapProvider === 'gmail' ? 'Gmail App Password (16 chars)' : 'Your email password'}
                 />
                 {formData.imapProvider === 'gmail' && (
@@ -637,7 +637,7 @@ export default function TemplatePage() {
                     }
                   }}
                   disabled={testingImap}
-                  className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium disabled:opacity-50"
+                  className="flex items-center space-x-2 px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted transition-colors text-sm font-medium disabled:opacity-50"
                 >
                   {testingImap ? (
                     <>
@@ -685,7 +685,7 @@ export default function TemplatePage() {
             <button
               type="button"
               onClick={() => router.push('/dashboard')}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              className="px-6 py-3 border border-input text-foreground rounded-lg hover:bg-muted/50 transition-colors font-medium"
             >
               Cancel
             </button>

@@ -153,18 +153,18 @@ export default function WatchPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+      <div className="bg-card rounded-xl shadow-md p-6">
+        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <Gauge className="h-7 w-7 text-brand-green" />
           Auto pilot
         </h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-muted-foreground mt-2">
           Auto pilot runs in the background on a schedule and sends applications for you
           when new listings appear on your selected boards that match your keywords and
           filters. It uses your saved profile template. Roles you have already applied to
           are skipped so you do not duplicate.
         </p>
-        <p className="text-sm text-gray-500 mt-3">
+        <p className="text-sm text-muted-foreground mt-3">
           For one-off applies without the schedule, use{' '}
           <Link href="/dashboard/apply" className="text-brand-green font-medium hover:underline">
             Apply to Jobs
@@ -173,21 +173,21 @@ export default function WatchPage() {
         </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-md p-6 space-y-6">
+      <div className="bg-card rounded-xl shadow-md p-6 space-y-6">
         <label className="flex items-center gap-3 cursor-pointer">
           <input
             type="checkbox"
             checked={enabled}
             onChange={(e) => setEnabled(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-brand-orange focus:ring-brand-green"
+            className="h-4 w-4 rounded border-input text-brand-orange focus:ring-brand-green"
           />
-          <span className="font-medium text-gray-900">
+          <span className="font-medium text-foreground">
             Enable Auto pilot (scheduled auto-apply — requires cron setup below)
           </span>
         </label>
 
         <div>
-          <p className="text-sm font-medium text-gray-700 mb-2">
+          <p className="text-sm font-medium text-foreground mb-2">
             Companies ({PRESET_BOARDS.length} Greenhouse boards)
           </p>
           <PresetBoardPicker
@@ -198,7 +198,7 @@ export default function WatchPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Keywords
             </label>
             <input
@@ -206,11 +206,11 @@ export default function WatchPage() {
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
               placeholder="e.g. engineer, data"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Location
             </label>
             <input
@@ -218,11 +218,11 @@ export default function WatchPage() {
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="Optional"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Department
             </label>
             <input
@@ -230,7 +230,7 @@ export default function WatchPage() {
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
               placeholder="Optional"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green"
             />
           </div>
         </div>
@@ -279,24 +279,24 @@ export default function WatchPage() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl shadow-md p-6 space-y-3">
-        <h2 className="font-semibold text-gray-900">Auto pilot status</h2>
+      <div className="bg-card rounded-xl shadow-md p-6 space-y-3">
+        <h2 className="font-semibold text-foreground">Auto pilot status</h2>
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <div>
-            <dt className="text-gray-500">Jobs already applied (skipped next time)</dt>
-            <dd className="font-medium text-gray-900">{meta.appliedJobKeysCount}</dd>
+            <dt className="text-muted-foreground">Jobs already applied (skipped next time)</dt>
+            <dd className="font-medium text-foreground">{meta.appliedJobKeysCount}</dd>
           </div>
           <div>
-            <dt className="text-gray-500">Last run</dt>
-            <dd className="font-medium text-gray-900">
+            <dt className="text-muted-foreground">Last run</dt>
+            <dd className="font-medium text-foreground">
               {meta.lastRunAt
                 ? new Date(meta.lastRunAt).toLocaleString()
                 : '—'}
             </dd>
           </div>
           <div className="sm:col-span-2">
-            <dt className="text-gray-500">Last summary</dt>
-            <dd className="font-medium text-gray-900">
+            <dt className="text-muted-foreground">Last summary</dt>
+            <dd className="font-medium text-foreground">
               {meta.lastRunSummary || '—'}
             </dd>
           </div>
@@ -311,7 +311,7 @@ export default function WatchPage() {
           environment, then call the endpoint below on a timer so Auto pilot can
           auto-apply for you:
         </p>
-        <pre className="bg-white/80 border border-amber-200 rounded-lg p-3 overflow-x-auto text-xs">
+        <pre className="bg-card/80 border border-amber-200 rounded-lg p-3 overflow-x-auto text-xs">
           {`curl -sS -H "Authorization: Bearer $CRON_SECRET" \\
   "$NEXTAUTH_URL/api/cron/watch"`}
         </pre>

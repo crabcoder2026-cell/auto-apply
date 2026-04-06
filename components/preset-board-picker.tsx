@@ -69,14 +69,14 @@ export function PresetBoardPicker({ selected, onToggle, disabled }: Props) {
     <div className="space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="search"
             placeholder="Search companies, category, or board id…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             disabled={disabled}
-            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-green focus:border-transparent"
+            className="w-full rounded-lg border border-input bg-background py-2 pl-9 pr-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
             aria-label="Filter preset companies"
           />
         </div>
@@ -93,22 +93,22 @@ export function PresetBoardPicker({ selected, onToggle, disabled }: Props) {
             type="button"
             disabled={disabled || visibleIds.size === 0}
             onClick={clearFiltered}
-            className="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-lg border border-input px-3 py-1.5 text-foreground hover:bg-muted/50 disabled:opacity-50"
           >
             Clear matching
           </button>
         </div>
       </div>
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-muted-foreground">
         {selectedCount} selected · {PRESET_BOARDS.length} boards ·{' '}
-        <span className="text-gray-600">
+        <span className="text-foreground/80">
           Badge shows Greenhouse URL style (both work for apply).
         </span>
       </p>
 
-      <div className="max-h-[min(28rem,55vh)] overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100 bg-white">
+      <div className="max-h-[min(28rem,55vh)] divide-y divide-border overflow-y-auto rounded-xl border-2 border-border bg-card">
         {filteredGrouped.size === 0 ? (
-          <p className="p-4 text-sm text-gray-500 text-center">No companies match.</p>
+          <p className="p-4 text-center text-sm text-muted-foreground">No companies match.</p>
         ) : (
           [...filteredGrouped.entries()].map(([category, boards]) => {
             const isCollapsed = collapsed[category];
@@ -117,15 +117,15 @@ export function PresetBoardPicker({ selected, onToggle, disabled }: Props) {
                 <button
                   type="button"
                   onClick={() => toggleCategory(category)}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 text-left text-sm font-semibold text-gray-800"
+                  className="flex w-full items-center gap-2 bg-muted/40 px-3 py-2.5 text-left text-sm font-semibold text-foreground hover:bg-muted/60"
                 >
                   {isCollapsed ? (
-                    <ChevronRight className="h-4 w-4 shrink-0 text-gray-500" />
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                   ) : (
-                    <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" />
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                   )}
                   <span className="flex-1">{category}</span>
-                  <span className="text-xs font-normal text-gray-500">
+                  <span className="text-xs font-normal text-muted-foreground">
                     {boards.length}
                   </span>
                 </button>
@@ -133,17 +133,17 @@ export function PresetBoardPicker({ selected, onToggle, disabled }: Props) {
                   <ul className="p-2 space-y-1">
                     {boards.map((b) => (
                       <li key={b.id}>
-                        <label className="flex items-start gap-3 p-2 rounded-md hover:bg-gray-50 cursor-pointer">
+                        <label className="flex cursor-pointer items-start gap-3 rounded-md p-2 hover:bg-muted/40">
                           <input
                             type="checkbox"
                             checked={!!selected[b.id]}
                             onChange={() => onToggle(b.id)}
                             disabled={disabled}
-                            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-orange shrink-0"
+                            className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary"
                           />
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2 gap-y-1">
-                              <span className="font-medium text-gray-900 text-sm">
+                              <span className="text-sm font-medium text-foreground">
                                 {b.name}
                               </span>
                               <span
@@ -164,7 +164,7 @@ export function PresetBoardPicker({ selected, onToggle, disabled }: Props) {
                               </span>
                             </div>
                             <p
-                              className="text-xs text-gray-500 truncate mt-0.5"
+                              className="mt-0.5 truncate text-xs text-muted-foreground"
                               title={b.url}
                             >
                               {b.url}

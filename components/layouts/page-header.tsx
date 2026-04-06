@@ -9,11 +9,18 @@ export function PageHeader({
   className?: string
 }) {
   return (
-    <div className={cn('flex items-start justify-between gap-4 pb-6 border-b', className)}>
-      <div>
-        <h1 className="font-display text-2xl font-semibold tracking-tight">{title}</h1>
+    <div
+      className={cn(
+        'relative flex flex-col gap-4 border-b border-border/80 pb-8 sm:flex-row sm:items-end sm:justify-between',
+        className
+      )}
+    >
+      <div className="max-w-2xl">
+        <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+          {title}
+        </h1>
         {description && (
-          <p className="text-sm text-muted-foreground mt-1">{description}</p>
+          <p className="mt-2 text-base leading-relaxed text-muted-foreground">{description}</p>
         )}
       </div>
       {actions && (

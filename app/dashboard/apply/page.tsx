@@ -137,7 +137,7 @@ export default function ApplyPage() {
       case 'requires_manual':
         return <AlertCircle className="h-5 w-5 text-amber-600" />;
       default:
-        return <AlertCircle className="h-5 w-5 text-gray-600" />;
+        return <AlertCircle className="h-5 w-5 text-muted-foreground" />;
     }
   };
 
@@ -157,25 +157,25 @@ export default function ApplyPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+      <div className="bg-card rounded-xl shadow-md p-6">
+        <h1 className="text-2xl font-bold text-foreground flex items-center">
           <Send className="h-7 w-7 mr-2 text-brand-green" />
           Apply to Jobs
         </h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-muted-foreground mt-2">
           Submit applications automatically using your saved template
         </p>
       </div>
 
       {/* Mode Selection */}
-      <div className="bg-white rounded-xl shadow-md p-6">
+      <div className="bg-card rounded-xl shadow-md p-6">
         <div className="flex space-x-4 mb-6">
           <button
             onClick={() => setMode('single')}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2 ${
               mode === 'single'
                 ? 'bg-brand-orange text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : 'bg-muted text-foreground hover:bg-muted'
             }`}
           >
             <LinkIcon className="h-5 w-5" />
@@ -186,7 +186,7 @@ export default function ApplyPage() {
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2 ${
               mode === 'batch'
                 ? 'bg-brand-orange text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : 'bg-muted text-foreground hover:bg-muted'
             }`}
           >
             <Briefcase className="h-5 w-5" />
@@ -198,7 +198,7 @@ export default function ApplyPage() {
         {mode === 'single' && (
           <div className="space-y-4">
             <div>
-              <label htmlFor="jobUrl" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="jobUrl" className="block text-sm font-medium text-foreground mb-2">
                 Job or careers page URL *
               </label>
               <input
@@ -207,10 +207,10 @@ export default function ApplyPage() {
                 value={jobUrl}
                 onChange={(e) => setJobUrl(e.target.value)}
                 placeholder="https://company.com/careers/job/… or boards.greenhouse.io/…/jobs/…"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 disabled={loading}
               />
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Use a direct Greenhouse link or your company&apos;s careers page if it embeds
                 Greenhouse (we open the embedded board when needed).
               </p>
@@ -240,7 +240,7 @@ export default function ApplyPage() {
         {mode === 'batch' && (
           <div className="space-y-4">
             <div>
-              <p className="block text-sm font-medium text-gray-700 mb-2">
+              <p className="block text-sm font-medium text-foreground mb-2">
                 Preset companies ({PRESET_BOARDS.length} boards)
               </p>
               <PresetBoardPicker
@@ -248,7 +248,7 @@ export default function ApplyPage() {
                 onToggle={togglePreset}
                 disabled={loading}
               />
-              <p className="text-sm text-gray-500 mt-3">
+              <p className="text-sm text-muted-foreground mt-3">
                 If you select any preset, only those boards are used for this run
                 (custom URL is ignored). For hands-off auto-apply on a schedule and
                 duplicate protection,{' '}
@@ -260,7 +260,7 @@ export default function ApplyPage() {
             </div>
 
             <div>
-              <label htmlFor="boardUrl" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="boardUrl" className="block text-sm font-medium text-foreground mb-2">
                 Custom board or careers page URL (optional)
               </label>
               <input
@@ -269,10 +269,10 @@ export default function ApplyPage() {
                 value={boardUrl}
                 onChange={(e) => setBoardUrl(e.target.value)}
                 placeholder="https://company.com/careers or job-boards.greenhouse.io/…"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                 disabled={loading}
               />
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 When no preset is selected: direct Greenhouse board URL, or a careers page
                 that embeds Greenhouse (we resolve the board from the page).
               </p>
@@ -280,7 +280,7 @@ export default function ApplyPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label htmlFor="keywords" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="keywords" className="block text-sm font-medium text-foreground mb-2">
                   Keywords (optional)
                 </label>
                 <input
@@ -289,13 +289,13 @@ export default function ApplyPage() {
                   value={keywords}
                   onChange={(e) => setKeywords(e.target.value)}
                   placeholder="Software Engineer"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                  className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                   disabled={loading}
                 />
               </div>
 
               <div>
-                <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="location" className="block text-sm font-medium text-foreground mb-2">
                   Location (optional)
                 </label>
                 <input
@@ -304,13 +304,13 @@ export default function ApplyPage() {
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   placeholder="San Francisco"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                  className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                   disabled={loading}
                 />
               </div>
 
               <div>
-                <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="department" className="block text-sm font-medium text-foreground mb-2">
                   Department (optional)
                 </label>
                 <input
@@ -319,7 +319,7 @@ export default function ApplyPage() {
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
                   placeholder="Engineering"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                  className="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
                   disabled={loading}
                 />
               </div>
@@ -373,21 +373,21 @@ export default function ApplyPage() {
 
       {/* Results */}
       {result && (
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Application Results</h2>
+        <div className="bg-card rounded-xl shadow-md p-6">
+          <h2 className="text-xl font-bold text-foreground mb-4">Application Results</h2>
 
           {mode === 'single' && result.result && (
             <div className="space-y-4">
-              <div className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-start space-x-3 p-4 bg-muted/50 rounded-lg">
                 {getStatusIcon(result.result.status)}
                 <div className="flex-1">
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-foreground">
                     {result.result.jobInfo.jobTitle}
                   </p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     {result.result.jobInfo.companyName} - {result.result.jobInfo.location}
                   </p>
-                  <p className="text-sm font-medium text-gray-700 mt-1">
+                  <p className="text-sm font-medium text-foreground mt-1">
                     {getStatusText(result.result.status)}
                   </p>
                   {result.result.errorMessage && (
@@ -409,7 +409,7 @@ export default function ApplyPage() {
                     Greenhouse sent a security code to verify your application. Copy this code and enter it on the application page if needed:
                   </p>
                   <div className="flex items-center space-x-3">
-                    <code className="flex-1 px-4 py-3 bg-white border-2 border-amber-400 rounded-lg text-2xl font-mono font-bold text-center tracking-widest text-gray-900">
+                    <code className="flex-1 px-4 py-3 bg-card border-2 border-amber-400 rounded-lg text-2xl font-mono font-bold text-center tracking-widest text-foreground">
                       {result.result.securityCode}
                     </code>
                     <button
@@ -428,16 +428,16 @@ export default function ApplyPage() {
 
               {/* Filled Fields Details */}
               {result.result.filledFields && result.result.filledFields.length > 0 && (
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="bg-gray-100 px-4 py-3 border-b border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-800 flex items-center">
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <div className="bg-muted px-4 py-3 border-b border-border">
+                    <h3 className="text-sm font-semibold text-foreground flex items-center">
                       <FileText className="h-4 w-4 mr-2 text-brand-green" />
                       Fields Filled ({result.result.filledFields.length})
                     </h3>
                   </div>
-                  <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+                  <div className="divide-y divide-border max-h-80 overflow-y-auto">
                     {result.result.filledFields.map((ff: FilledField, idx: number) => (
-                      <div key={idx} className="flex items-center px-4 py-2.5 hover:bg-gray-50">
+                      <div key={idx} className="flex items-center px-4 py-2.5 hover:bg-muted/50">
                         <div className="flex-shrink-0 mr-3">
                           {ff.source === 'template' ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
@@ -452,18 +452,18 @@ export default function ApplyPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className="text-sm font-medium text-gray-700">{ff.field}</span>
+                          <span className="text-sm font-medium text-foreground">{ff.field}</span>
                         </div>
                         <div className="flex-shrink-0 ml-4 max-w-[50%]">
-                          <span className="text-sm text-gray-600 truncate block" title={ff.value}>
+                          <span className="text-sm text-muted-foreground truncate block" title={ff.value}>
                             {ff.value}
                           </span>
                         </div>
                       </div>
                     ))}
                   </div>
-                  <div className="bg-gray-50 px-4 py-2 border-t border-gray-200">
-                    <div className="flex items-center space-x-4 text-xs text-gray-500">
+                  <div className="bg-muted/50 px-4 py-2 border-t border-border">
+                    <div className="flex items-center space-x-4 text-xs text-muted-foreground">
                       <span className="flex items-center">
                         <span className="w-2 h-2 rounded-full bg-blue-400 mr-1.5"></span>
                         Template: {result.result.filledFields.filter((f: FilledField) => f.source === 'template').length} fields
@@ -498,11 +498,11 @@ export default function ApplyPage() {
 
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {result.results.map((item: ApplicationResult, index: number) => (
-                  <div key={index} className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg">
+                  <div key={index} className="flex items-start space-x-3 p-4 bg-muted/50 rounded-lg">
                     {getStatusIcon(item.status)}
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900">{item.jobInfo.jobTitle}</p>
-                      <p className="text-sm text-gray-600">
+                      <p className="font-medium text-foreground">{item.jobInfo.jobTitle}</p>
+                      <p className="text-sm text-muted-foreground">
                         {item.jobInfo.companyName} - {item.jobInfo.location}
                       </p>
                       {item.errorMessage && (

@@ -10,8 +10,9 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
-        display: ['var(--font-display)', 'var(--font-sans)', 'sans-serif'],
+        sans: ['var(--font-body)', 'Georgia', 'serif'],
+        body: ['var(--font-body)', 'Georgia', 'serif'],
+        display: ['var(--font-display)', 'var(--font-body)', 'serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
       },
       backgroundImage: {
@@ -26,12 +27,12 @@ const config: Config = {
       },
       colors: {
         brand: {
-          green: '#008148',
-          'green-muted': '#e6f4ef',
-          'green-hover': '#006a3b',
-          orange: '#F37021',
-          'orange-hover': '#d95e1a',
-          red: '#EE2D24',
+          green: 'var(--brand-green)',
+          'green-muted': 'var(--brand-green-muted)',
+          'green-hover': 'var(--brand-green-hover)',
+          orange: 'var(--brand-orange)',
+          'orange-hover': 'var(--brand-orange-hover)',
+          red: 'var(--brand-red)',
         },
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
@@ -99,17 +100,40 @@ const config: Config = {
           from: { opacity: '1' },
           to: { opacity: '0' },
         },
+        'reveal-up': {
+          from: {
+            opacity: '0',
+            transform: 'translateY(28px) rotate(-0.4deg)',
+          },
+          to: { opacity: '1', transform: 'translateY(0) rotate(0)' },
+        },
+        'nav-slide': {
+          from: { opacity: '0', transform: 'translateY(-18px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        'mesh-drift': {
+          '0%, 100%': { transform: 'translate(0,0) scale(1)' },
+          '50%': { transform: 'translate(1.5%, -1%) scale(1.02)' },
+        },
       },
       transitionDuration: {
         fast: 'var(--duration-fast)',
         normal: 'var(--duration-normal)',
         slow: 'var(--duration-slow)',
       },
+      boxShadow: {
+        brutal: 'var(--shadow-brutal)',
+        'brutal-lg': 'var(--shadow-brutal-lg)',
+        glow: 'var(--glow-accent)',
+      },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'fade-in': 'fade-in 0.4s ease-out',
         'fade-out': 'fade-out 0.2s ease-out',
+        'reveal-up': 'reveal-up 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards',
+        'nav-slide': 'nav-slide 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards',
+        'mesh-drift': 'mesh-drift 28s ease-in-out infinite',
       },
     },
   },

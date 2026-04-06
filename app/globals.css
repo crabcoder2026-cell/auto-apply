@@ -2,42 +2,230 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design system: warm editorial base, vermillion + teal + gold accents.
+ * Mesh + grain on body; CSS variables power light (default) and .dark.
+ */
+
 :root {
-  --foreground-rgb: 17, 24, 39;
-  --background-start-rgb: 230, 244, 239;
-  --background-end-rgb: 255, 255, 255;
-  --brand-green: #008148;
-  --brand-orange: #f37021;
-  --brand-red: #ee2d24;
+  --paper: 38 32% 96%;
+  --background: 36 28% 93%;
+  --foreground: 24 14% 11%;
+  --card: 40 35% 98%;
+  --card-foreground: 24 14% 11%;
+  --popover: 40 35% 99%;
+  --popover-foreground: 24 14% 11%;
+  --primary: 16 86% 48%;
+  --primary-foreground: 40 40% 98%;
+  --secondary: 168 55% 22%;
+  --secondary-foreground: 42 40% 96%;
+  --muted: 34 18% 86%;
+  --muted-foreground: 24 10% 38%;
+  --accent: 43 96% 56%;
+  --accent-foreground: 24 14% 11%;
+  --destructive: 0 72% 46%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 32 14% 78%;
+  --input: 32 14% 78%;
+  --ring: 16 86% 48%;
+  --radius: 0.85rem;
+
+  --chart-1: 16 86% 48%;
+  --chart-2: 168 55% 32%;
+  --chart-3: 43 96% 50%;
+  --chart-4: 24 14% 35%;
+  --chart-5: 330 70% 50%;
+
+  --duration-fast: 150ms;
+  --duration-normal: 280ms;
+  --duration-slow: 480ms;
+
+  --shadow-brutal: 6px 6px 0 0 hsl(var(--primary) / 0.22);
+  --shadow-brutal-lg: 10px 10px 0 0 hsl(var(--secondary) / 0.18);
+  --glow-accent: 0 0 40px -8px hsl(var(--accent) / 0.45);
+
+  /* Legacy brand keys used in some components */
+  --brand-green: #0f5c4a;
+  --brand-green-muted: #d8ebe4;
+  --brand-green-hover: #0a4538;
+  --brand-orange: #e85d04;
+  --brand-orange-hover: #c2410c;
+  --brand-red: #dc2626;
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      rgb(var(--background-start-rgb)),
-      rgb(var(--background-end-rgb))
-    );
-}
+.dark {
+  --paper: 220 16% 8%;
+  --background: 222 18% 6%;
+  --foreground: 40 25% 94%;
+  --card: 220 16% 10%;
+  --card-foreground: 40 25% 94%;
+  --popover: 220 16% 11%;
+  --popover-foreground: 40 25% 94%;
+  --primary: 18 90% 58%;
+  --primary-foreground: 222 18% 8%;
+  --secondary: 168 40% 42%;
+  --secondary-foreground: 222 18% 8%;
+  --muted: 220 14% 16%;
+  --muted-foreground: 35 12% 68%;
+  --accent: 43 90% 58%;
+  --accent-foreground: 222 18% 8%;
+  --destructive: 0 62% 50%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 220 12% 20%;
+  --input: 220 12% 20%;
+  --ring: 18 90% 58%;
 
-/* Ensure form elements always have dark text for readability */
-input,
-textarea,
-select {
-  color: #111827 !important;
-}
-
-input::placeholder,
-textarea::placeholder {
-  color: #9ca3af !important;
+  --brand-green: #3d9b7a;
+  --brand-green-muted: #1a2e28;
+  --brand-green-hover: #52b894;
+  --brand-orange: #fb923c;
+  --brand-orange-hover: #fdba74;
+  --brand-red: #f87171;
 }
 
 @layer base {
   * {
     @apply border-border;
   }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: 'kern' 1, 'liga' 1;
+    position: relative;
+    min-height: 100vh;
+  }
+
+  /* Atmospheric mesh — fixed under content */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background:
+      radial-gradient(ellipse 90% 55% at 8% -15%, hsl(var(--primary) / 0.14), transparent 52%),
+      radial-gradient(ellipse 70% 45% at 105% 5%, hsl(var(--secondary) / 0.12), transparent 48%),
+      radial-gradient(ellipse 55% 50% at 75% 105%, hsl(var(--accent) / 0.1), transparent 55%),
+      linear-gradient(165deg, hsl(var(--background)) 0%, hsl(var(--paper)) 45%, hsl(var(--background)) 100%);
+    pointer-events: none;
+  }
+
+  /* Film grain */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    opacity: 0.055;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.22);
+    color: hsl(var(--foreground));
+  }
+
+  input,
+  textarea,
+  select {
+    color: hsl(var(--foreground));
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: hsl(var(--muted-foreground));
+  }
+}
+
+@layer utilities {
+  .hero-gradient {
+    position: relative;
+    min-height: 100vh;
+    background: linear-gradient(
+      135deg,
+      hsl(var(--background)) 0%,
+      hsl(var(--paper)) 38%,
+      hsl(var(--muted)) 100%
+    );
+  }
+
+  .hero-gradient::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      circle at 15% 85%,
+      hsl(var(--primary) / 0.12),
+      transparent 42%
+    );
+    pointer-events: none;
+  }
+
+  .text-gradient-warm {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(
+      120deg,
+      hsl(var(--foreground)) 0%,
+      hsl(var(--secondary)) 45%,
+      hsl(var(--primary)) 100%
+    );
+  }
+
+  .border-diagonal-accent {
+    border-image: linear-gradient(
+        135deg,
+        hsl(var(--border)),
+        hsl(var(--primary) / 0.45),
+        hsl(var(--accent) / 0.5)
+      )
+      1;
+  }
+
+  .reveal-up {
+    animation: reveal-up 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    opacity: 0;
+  }
+
+  .hover-lift {
+    @apply transition-transform duration-normal ease-out;
+  }
+  .hover-lift:hover {
+    transform: translateY(-3px) rotate(-0.25deg);
+  }
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(28px) rotate(-0.4deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotate(0);
+  }
+}
+
+@keyframes mesh-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(1.5%, -1%) scale(1.02);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--accent) / 0.35);
+  }
+  50% {
+    box-shadow: 0 0 28px 4px hsl(var(--accent) / 0.2);
   }
 }
 

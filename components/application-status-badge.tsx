@@ -24,7 +24,7 @@ export function ApplicationStatusBadge({ status }: { status: string }) {
       </span>
     ),
     skipped: (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
         <AlertCircle className="h-3 w-3 shrink-0" />
         Skipped
       </span>

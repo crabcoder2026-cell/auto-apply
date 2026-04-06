@@ -189,12 +189,12 @@ export default function AutoSearchPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 px-0">
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+      <div className="bg-card rounded-xl shadow-md p-6">
+        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <Search className="h-7 w-7 text-brand-green" />
           Auto Search
         </h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-muted-foreground mt-2">
           Openings from curated Greenhouse boards are saved in a <strong>shared job feed</strong>{' '}
           (full board listings). The table shows only rows that match your filters (e.g.
           keyword in title). <strong>First found</strong> is the first time Auto Search saw
@@ -208,7 +208,7 @@ export default function AutoSearchPage() {
           </Link>
           .
         </p>
-        <p className="text-sm text-gray-500 mt-2">
+        <p className="text-sm text-muted-foreground mt-2">
           This page also refreshes in the background every 30 minutes while it stays
           open. For hands-off applying to matching roles, use{' '}
           <Link href="/dashboard/watch" className="text-brand-green font-medium hover:underline">
@@ -220,17 +220,17 @@ export default function AutoSearchPage() {
 
       <form
         onSubmit={onSearch}
-        className="bg-white rounded-xl shadow-md p-6 space-y-4"
+        className="bg-card rounded-xl shadow-md p-6 space-y-4"
       >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Company
             </label>
             <select
               value={boardId}
               onChange={(e) => setBoardId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green bg-white"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green bg-card"
             >
               <option value="">All companies</option>
               {JOB_BOARD_DIRECTORY.map((b) => (
@@ -241,7 +241,7 @@ export default function AutoSearchPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Keywords (title)
             </label>
             <input
@@ -249,11 +249,11 @@ export default function AutoSearchPage() {
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
               placeholder="e.g. engineer"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Location
             </label>
             <input
@@ -261,11 +261,11 @@ export default function AutoSearchPage() {
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="e.g. remote, SF"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Department
             </label>
             <input
@@ -273,7 +273,7 @@ export default function AutoSearchPage() {
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
               placeholder="Optional"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green"
             />
           </div>
         </div>
@@ -299,7 +299,7 @@ export default function AutoSearchPage() {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh now
           </button>
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-muted-foreground">
             Cache updated:{' '}
             {cacheUpdatedAt
               ? new Date(cacheUpdatedAt).toLocaleString()
@@ -348,27 +348,27 @@ export default function AutoSearchPage() {
         )}
       </form>
 
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+      <div className="bg-card rounded-xl shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-muted/50 border-b border-border">
               <tr>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                <th className="text-left py-3 px-4 font-semibold text-foreground">
                   Company
                 </th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                <th className="text-left py-3 px-4 font-semibold text-foreground">
                   Title
                 </th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                <th className="text-left py-3 px-4 font-semibold text-foreground">
                   Location
                 </th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700 whitespace-nowrap">
+                <th className="text-left py-3 px-4 font-semibold text-foreground whitespace-nowrap">
                   First found
                 </th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                <th className="text-left py-3 px-4 font-semibold text-foreground">
                   Status
                 </th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-700">
+                <th className="text-right py-3 px-4 font-semibold text-foreground">
                   Actions
                 </th>
               </tr>
@@ -376,13 +376,13 @@ export default function AutoSearchPage() {
             <tbody>
               {loading && jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-16 text-center text-gray-500">
+                  <td colSpan={6} className="py-16 text-center text-muted-foreground">
                     <Loader2 className="h-8 w-8 animate-spin text-brand-green mx-auto" />
                   </td>
                 </tr>
               ) : jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-gray-500">
+                  <td colSpan={6} className="py-12 text-center text-muted-foreground">
                     No jobs match your filters, or the feed has not been populated yet.
                   </td>
                 </tr>
@@ -394,26 +394,26 @@ export default function AutoSearchPage() {
                   return (
                     <tr
                       key={`${job.boardToken}-${job.jobId}`}
-                      className="border-b border-gray-100 hover:bg-gray-50/80"
+                      className="border-b border-border hover:bg-muted/50"
                     >
                       <td className="py-3 px-4">
-                        <div className="font-medium text-gray-900">
+                        <div className="font-medium text-foreground">
                           {job.companyName}
                         </div>
-                        <div className="text-xs text-gray-500">{job.category}</div>
+                        <div className="text-xs text-muted-foreground">{job.category}</div>
                       </td>
-                      <td className="py-3 px-4 text-gray-800 max-w-xs">
+                      <td className="py-3 px-4 text-foreground max-w-xs">
                         <span className="line-clamp-2">{job.title}</span>
                         {job.department && (
-                          <div className="text-xs text-gray-500 mt-0.5">
+                          <div className="text-xs text-muted-foreground mt-0.5">
                             {job.department}
                           </div>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-gray-600 whitespace-nowrap">
+                      <td className="py-3 px-4 text-muted-foreground whitespace-nowrap">
                         {job.location || '—'}
                       </td>
-                      <td className="py-3 px-4 text-gray-600 whitespace-nowrap text-xs">
+                      <td className="py-3 px-4 text-muted-foreground whitespace-nowrap text-xs">
                         {job.firstFoundAt
                           ? new Date(job.firstFoundAt).toLocaleString()
                           : '—'}
@@ -422,7 +422,7 @@ export default function AutoSearchPage() {
                         {hist ? (
                           <ApplicationStatusBadge status={hist.status} />
                         ) : (
-                          <span className="text-xs text-gray-400">Not applied</span>
+                          <span className="text-xs text-muted-foreground">Not applied</span>
                         )}
                       </td>
                       <td className="py-3 px-4 text-right whitespace-nowrap">
@@ -465,7 +465,7 @@ export default function AutoSearchPage() {
         <p>
           Set <code className="bg-amber-100 px-1 rounded">CRON_SECRET</code> and call:
         </p>
-        <pre className="bg-white/80 border border-amber-200 rounded-lg p-3 overflow-x-auto text-xs">
+        <pre className="bg-card/80 border border-amber-200 rounded-lg p-3 overflow-x-auto text-xs">
           {`curl -sS -H "Authorization: Bearer $CRON_SECRET" \\
   "$NEXTAUTH_URL/api/cron/job-feed"`}
         </pre>

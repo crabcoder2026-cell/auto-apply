@@ -119,7 +119,7 @@ export default function HistoryPage() {
         </span>
       ),
       skipped: (
-        <span className="inline-flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+        <span className="inline-flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-medium bg-muted text-foreground">
           <AlertCircle className="h-3 w-3" />
           <span>Skipped</span>
         </span>
@@ -137,7 +137,7 @@ export default function HistoryPage() {
         className={
           isPilot
             ? 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-violet-100 text-violet-900 border border-violet-200'
-            : 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200'
+            : 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-foreground border border-border'
         }
       >
         {applicationSourceLabel(src)}
@@ -167,36 +167,36 @@ export default function HistoryPage() {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+      <div className="bg-card rounded-xl shadow-md p-6">
+        <h1 className="text-2xl font-bold text-foreground flex items-center">
           <History className="h-7 w-7 mr-2 text-brand-green" />
           Application History
         </h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-muted-foreground mt-2">
           Track and review all your job applications
         </p>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-md p-6">
+      <div className="bg-card rounded-xl shadow-md p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search by job title or company..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent"
             />
           </div>
 
           <div className="relative">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent appearance-none"
+              className="w-full pl-10 pr-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent appearance-none"
             >
               <option value="all">All Statuses</option>
               <option value="success">Success</option>
@@ -207,11 +207,11 @@ export default function HistoryPage() {
           </div>
 
           <div className="relative">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <select
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent appearance-none"
+              className="w-full pl-10 pr-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent appearance-none"
               aria-label="Filter by how you applied"
             >
               <option value="all">All sources</option>
@@ -223,11 +223,11 @@ export default function HistoryPage() {
       </div>
 
       {/* Applications List */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+      <div className="bg-card rounded-xl shadow-md overflow-hidden">
         {filteredApplications.length === 0 ? (
           <div className="p-12 text-center">
-            <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600 text-lg font-medium">
+            <History className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground text-lg font-medium">
               {applications.length === 0
                 ? 'No applications yet'
                 : 'No applications match your filters'}
@@ -243,45 +243,45 @@ export default function HistoryPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-muted/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Job Details
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Company
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Source
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Applied
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-card divide-y divide-border">
                 {filteredApplications.map((app) => (
-                  <tr key={app.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={app.id} className="hover:bg-muted/50 transition-colors">
                     <td className="px-6 py-4">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{app.jobTitle}</p>
+                        <p className="text-sm font-medium text-foreground">{app.jobTitle}</p>
                         {app.location && (
-                          <p className="text-sm text-gray-500">{app.location}</p>
+                          <p className="text-sm text-muted-foreground">{app.location}</p>
                         )}
                         {app.department && (
-                          <p className="text-xs text-gray-400 mt-1">{app.department}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{app.department}</p>
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-gray-900">{app.companyName}</p>
+                      <p className="text-sm text-foreground">{app.companyName}</p>
                     </td>
                     <td className="px-6 py-4">{sourceBadge(app)}</td>
                     <td className="px-6 py-4">
@@ -295,7 +295,7 @@ export default function HistoryPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-gray-900">{formatDate(app.appliedAt)}</p>
+                      <p className="text-sm text-foreground">{formatDate(app.appliedAt)}</p>
                     </td>
                     <td className="px-6 py-4">
                       <a
@@ -318,7 +318,7 @@ export default function HistoryPage() {
 
       {/* Summary */}
       {applications.length > 0 && (
-        <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-600">
+        <div className="bg-muted/50 rounded-xl p-4 text-sm text-muted-foreground">
           Showing {filteredApplications.length} of {applications.length} applications
         </div>
       )}
