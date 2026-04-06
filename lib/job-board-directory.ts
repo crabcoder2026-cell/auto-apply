@@ -1,6 +1,6 @@
 /**
  * Greenhouse boards scraped for Auto Search (job discovery).
- * Currently only Figma; add entries to include more boards.
+ * Currently only Anthropic; add entries to include more boards.
  */
 
 export interface JobBoardDirectoryEntry {
@@ -14,10 +14,10 @@ export interface JobBoardDirectoryEntry {
 
 export const JOB_BOARD_DIRECTORY: JobBoardDirectoryEntry[] = [
   {
-    id: 'figma',
-    displayName: 'Figma',
-    category: 'Design / Collaboration',
-    boardUrl: 'https://boards.greenhouse.io/figma',
+    id: 'anthropic',
+    displayName: 'Anthropic',
+    category: 'Artificial Intelligence',
+    boardUrl: 'https://job-boards.greenhouse.io/anthropic',
   },
 ];
 
