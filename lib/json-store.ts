@@ -60,6 +60,8 @@ export interface CachedJobRow {
   location: string | null;
   department: string | null;
   jobUrl: string;
+  /** ISO time this posting was first seen by Auto Search (never moves forward on rescrape) */
+  firstFoundAt: string;
 }
 
 export interface JobFeedCache {
@@ -68,6 +70,10 @@ export interface JobFeedCache {
   boardsFailed: number;
   boardErrors: { boardId: string; message: string }[];
   jobs: CachedJobRow[];
+  /**
+   * Stable key `boardToken:jobId` -> ISO first-seen (persists if job drops off board and returns).
+   */
+  firstSeenByJobKey: Record<string, string>;
 }
 
 /** Auto pilot / watch: preset boards + filters, dedupe by boardToken:jobId */
@@ -110,6 +116,20 @@ function readStoreSync(): Store {
   const parsed = JSON.parse(raw) as Store;
   if (!parsed.watchConfigs) parsed.watchConfigs = [];
   if (parsed.jobFeedCache === undefined) parsed.jobFeedCache = null;
+  if (parsed.jobFeedCache) {
+    const c = parsed.jobFeedCache;
+    if (!c.firstSeenByJobKey) c.firstSeenByJobKey = {};
+    const map = c.firstSeenByJobKey;
+    if (c.jobs) {
+      for (const j of c.jobs) {
+        const k = `${j.boardToken}:${j.jobId}`;
+        if (!j.firstFoundAt) {
+          j.firstFoundAt = map[k] ?? c.updatedAt ?? new Date().toISOString();
+        }
+        if (!map[k]) map[k] = j.firstFoundAt;
+      }
+    }
+  }
   return parsed;
 }
 

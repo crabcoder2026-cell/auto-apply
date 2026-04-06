@@ -49,6 +49,7 @@ export default function AutoSearchPage() {
   const [jobs, setJobs] = useState<CachedJobRow[]>([]);
   const [cacheUpdatedAt, setCacheUpdatedAt] = useState<string | null>(null);
   const [totalMatching, setTotalMatching] = useState(0);
+  const [totalJobsInCache, setTotalJobsInCache] = useState(0);
   const [returned, setReturned] = useState(0);
   const [boardsFailed, setBoardsFailed] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
@@ -97,6 +98,7 @@ export default function AutoSearchPage() {
       setJobs(data.jobs || []);
       setCacheUpdatedAt(data.cacheUpdatedAt ?? null);
       setTotalMatching(data.totalMatching ?? 0);
+      setTotalJobsInCache(data.totalJobsInCache ?? 0);
       setReturned(data.returned ?? 0);
       setBoardsFailed(data.boardsFailed ?? 0);
       if (typeof data.message === 'string') setMessage(data.message);
@@ -193,9 +195,12 @@ export default function AutoSearchPage() {
           Auto Search
         </h1>
         <p className="text-gray-600 mt-2">
-          Browse openings from curated Greenhouse boards. The shared list is rebuilt on a
-          schedule (about every 30 minutes) using <strong>headless Chrome</strong> to open
-          each board page and read job links from the page — not the Greenhouse JSON API.
+          Openings from curated Greenhouse boards are saved in a <strong>shared job feed</strong>{' '}
+          (full board listings). The table shows only rows that match your filters (e.g.
+          keyword in title). <strong>First found</strong> is the first time Auto Search saw
+          that posting; it does not change if the same job appears again on a later scrape.
+          The feed is rebuilt on a schedule (about every 30 minutes) using{' '}
+          <strong>headless Chrome</strong> on each board page — not the Greenhouse JSON API.
           Click <strong>Apply</strong> to run automation for that role using your saved
           template. Track outcomes in{' '}
           <Link href="/dashboard/history" className="text-brand-green font-medium hover:underline">
@@ -299,10 +304,23 @@ export default function AutoSearchPage() {
             {cacheUpdatedAt
               ? new Date(cacheUpdatedAt).toLocaleString()
               : '—'}
+            {totalJobsInCache > 0 && (
+              <>
+                {' '}
+                · {totalJobsInCache} job{totalJobsInCache === 1 ? '' : 's'} in feed
+                {totalMatching !== totalJobsInCache && (
+                  <>
+                    {' '}
+                    · {totalMatching} match
+                    {totalMatching === 1 ? '' : 'es'} after filters
+                  </>
+                )}
+              </>
+            )}
             {returned > 0 && totalMatching > 0 && (
               <>
                 {' '}
-                · Showing {returned} of {totalMatching} matches
+                · Showing {returned} of {totalMatching}
               </>
             )}
             {boardsFailed > 0 && (
@@ -344,6 +362,9 @@ export default function AutoSearchPage() {
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">
                   Location
                 </th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700 whitespace-nowrap">
+                  First found
+                </th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">
                   Status
                 </th>
@@ -355,13 +376,13 @@ export default function AutoSearchPage() {
             <tbody>
               {loading && jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-16 text-center text-gray-500">
+                  <td colSpan={6} className="py-16 text-center text-gray-500">
                     <Loader2 className="h-8 w-8 animate-spin text-brand-green mx-auto" />
                   </td>
                 </tr>
               ) : jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-gray-500">
+                  <td colSpan={6} className="py-12 text-center text-gray-500">
                     No jobs match your filters, or the feed has not been populated yet.
                   </td>
                 </tr>
@@ -391,6 +412,11 @@ export default function AutoSearchPage() {
                       </td>
                       <td className="py-3 px-4 text-gray-600 whitespace-nowrap">
                         {job.location || '—'}
+                      </td>
+                      <td className="py-3 px-4 text-gray-600 whitespace-nowrap text-xs">
+                        {job.firstFoundAt
+                          ? new Date(job.firstFoundAt).toLocaleString()
+                          : '—'}
                       </td>
                       <td className="py-3 px-4">
                         {hist ? (

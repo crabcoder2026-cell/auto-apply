@@ -4,8 +4,8 @@ import type { CachedJobRow } from '@/lib/json-store';
 
 const BOARD_NAV_TIMEOUT_MS = 45000;
 
-/** Cap rows returned per board (matches aggregator limit) */
-const MAX_JOBS_PER_BOARD = 100;
+/** Cap rows returned per board (matches aggregator limit; scroll loads more listings) */
+const MAX_JOBS_PER_BOARD = 400;
 
 /**
  * Load a Greenhouse board careers page in a real browser and extract job links from the DOM.
@@ -28,9 +28,9 @@ export async function scrapeGreenhouseBoardJobList(
 
     await page.evaluate(async () => {
       const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-      for (let i = 0; i < 8; i++) {
-        window.scrollBy(0, 600);
-        await delay(120);
+      for (let i = 0; i < 24; i++) {
+        window.scrollBy(0, 800);
+        await delay(100);
       }
     });
 
@@ -139,6 +139,7 @@ export async function scrapeGreenhouseBoardJobList(
       location: s.location,
       department: s.department,
       jobUrl: s.jobUrl,
+      firstFoundAt: '',
     }));
 
     return { rows };

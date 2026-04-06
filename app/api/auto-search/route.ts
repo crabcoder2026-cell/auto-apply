@@ -62,6 +62,7 @@ export async function GET(request: Request) {
         boardsScanned: cache?.boardsScanned ?? 0,
         boardsFailed: cache?.boardsFailed ?? 0,
         totalMatching: 0,
+        totalJobsInCache: cache?.jobs.length ?? 0,
         message:
           cache == null
             ? 'Job feed not loaded yet. Run /api/cron/job-feed with CRON_SECRET (uses headless Chrome to scrape boards).'
@@ -75,12 +76,20 @@ export async function GET(request: Request) {
       department,
       boardId,
     });
+    const seenMs = (iso: string) => {
+      const t = Date.parse(iso);
+      return Number.isFinite(t) ? t : 0;
+    };
     filtered.sort((a, b) => {
+      const ta = seenMs(a.firstFoundAt);
+      const tb = seenMs(b.firstFoundAt);
+      if (tb !== ta) return tb - ta;
       const c = a.companyName.localeCompare(b.companyName);
       if (c !== 0) return c;
       return a.title.localeCompare(b.title);
     });
     const totalMatching = filtered.length;
+    const totalJobsInCache = cache.jobs.length;
     const jobs = filtered.slice(0, limit);
 
     return NextResponse.json({
@@ -90,6 +99,7 @@ export async function GET(request: Request) {
       boardsFailed: cache.boardsFailed,
       boardErrors: cache.boardErrors,
       totalMatching,
+      totalJobsInCache,
       returned: jobs.length,
     });
   } catch (e: unknown) {
