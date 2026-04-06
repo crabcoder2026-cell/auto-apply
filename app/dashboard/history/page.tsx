@@ -14,6 +14,32 @@ interface Application {
   status: string;
   errorMessage: string | null;
   appliedAt: string;
+  applicationData?: unknown | null;
+}
+
+type HistorySourceKey = 'watch' | 'single' | 'batch' | 'preset_batch' | 'unknown';
+
+function getApplicationSource(app: Application): HistorySourceKey {
+  const d = app.applicationData as { source?: string } | null | undefined;
+  const s = d?.source;
+  if (s === 'watch' || s === 'single' || s === 'batch' || s === 'preset_batch')
+    return s;
+  return 'unknown';
+}
+
+function applicationSourceLabel(source: HistorySourceKey): string {
+  switch (source) {
+    case 'watch':
+      return 'Auto pilot';
+    case 'single':
+      return 'Single job';
+    case 'batch':
+      return 'Batch · custom board';
+    case 'preset_batch':
+      return 'Batch · presets';
+    default:
+      return 'Apply';
+  }
 }
 
 export default function HistoryPage() {
@@ -22,6 +48,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sourceFilter, setSourceFilter] = useState<string>('all');
 
   const fetchHistory = useCallback(async () => {
     try {
@@ -59,8 +86,17 @@ export default function HistoryPage() {
     if (statusFilter !== 'all') {
       filtered = filtered.filter((app) => app.status === statusFilter);
     }
+    if (sourceFilter !== 'all') {
+      filtered = filtered.filter((app) => {
+        const s = getApplicationSource(app);
+        if (sourceFilter === 'auto_pilot') return s === 'watch';
+        if (sourceFilter === 'regular')
+          return s === 'single' || s === 'batch' || s === 'preset_batch' || s === 'unknown';
+        return true;
+      });
+    }
     setFilteredApplications(filtered);
-  }, [searchTerm, statusFilter, applications]);
+  }, [searchTerm, statusFilter, sourceFilter, applications]);
 
   const getStatusBadge = (status: string) => {
     const badges = {
@@ -91,6 +127,22 @@ export default function HistoryPage() {
     };
 
     return badges[status as keyof typeof badges] || badges.skipped;
+  };
+
+  const sourceBadge = (app: Application) => {
+    const src = getApplicationSource(app);
+    const isPilot = src === 'watch';
+    return (
+      <span
+        className={
+          isPilot
+            ? 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-violet-100 text-violet-900 border border-violet-200'
+            : 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200'
+        }
+      >
+        {applicationSourceLabel(src)}
+      </span>
+    );
   };
 
   const formatDate = (dateString: string) => {
@@ -127,7 +179,7 @@ export default function HistoryPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-md p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
@@ -151,6 +203,20 @@ export default function HistoryPage() {
               <option value="failed">Failed</option>
               <option value="requires_manual">Requires Manual</option>
               <option value="skipped">Skipped</option>
+            </select>
+          </div>
+
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <select
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent appearance-none"
+              aria-label="Filter by how you applied"
+            >
+              <option value="all">All sources</option>
+              <option value="auto_pilot">Auto pilot only</option>
+              <option value="regular">Apply page only</option>
             </select>
           </div>
         </div>
@@ -187,6 +253,9 @@ export default function HistoryPage() {
                     Company
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Source
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -214,6 +283,7 @@ export default function HistoryPage() {
                     <td className="px-6 py-4">
                       <p className="text-sm text-gray-900">{app.companyName}</p>
                     </td>
+                    <td className="px-6 py-4">{sourceBadge(app)}</td>
                     <td className="px-6 py-4">
                       <div>
                         {getStatusBadge(app.status)}

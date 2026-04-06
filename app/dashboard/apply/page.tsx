@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Send, Link as LinkIcon, Briefcase, Loader2, CheckCircle, XCircle, AlertCircle, FileText, Bot, User, Copy, Shield } from 'lucide-react';
 import { PRESET_BOARDS } from '@/lib/preset-boards';
+import { PresetBoardPicker } from '@/components/preset-board-picker';
 
 interface FilledField {
   field: string;
@@ -240,29 +241,14 @@ export default function ApplyPage() {
           <div className="space-y-4">
             <div>
               <p className="block text-sm font-medium text-gray-700 mb-2">
-                Preset companies
+                Preset companies ({PRESET_BOARDS.length} boards)
               </p>
-              <div className="space-y-2">
-                {PRESET_BOARDS.map((b) => (
-                  <label
-                    key={b.id}
-                    className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={!!selectedPresets[b.id]}
-                      onChange={() => togglePreset(b.id)}
-                      className="mt-1 h-4 w-4 rounded border-gray-300 text-brand-orange"
-                      disabled={loading}
-                    />
-                    <div>
-                      <span className="font-medium text-gray-900">{b.name}</span>
-                      <p className="text-xs text-gray-500 break-all">{b.url}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-              <p className="text-sm text-gray-500 mt-2">
+              <PresetBoardPicker
+                selected={selectedPresets}
+                onToggle={togglePreset}
+                disabled={loading}
+              />
+              <p className="text-sm text-gray-500 mt-3">
                 If you select any preset, only those boards are used for this run
                 (custom URL is ignored). For hands-off auto-apply on a schedule and
                 duplicate protection,{' '}

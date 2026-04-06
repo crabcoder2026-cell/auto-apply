@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { PRESET_BOARDS } from '@/lib/preset-boards';
+import { PresetBoardPicker } from '@/components/preset-board-picker';
 
 interface WatchState {
   enabled: boolean;
@@ -186,26 +187,13 @@ export default function WatchPage() {
         </label>
 
         <div>
-          <p className="text-sm font-medium text-gray-700 mb-2">Companies</p>
-          <div className="space-y-2">
-            {PRESET_BOARDS.map((b) => (
-              <label
-                key={b.id}
-                className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={!!selected[b.id]}
-                  onChange={() => toggleBoard(b.id)}
-                  className="mt-1 h-4 w-4 rounded border-gray-300 text-brand-orange"
-                />
-                <div>
-                  <span className="font-medium text-gray-900">{b.name}</span>
-                  <p className="text-xs text-gray-500 break-all">{b.url}</p>
-                </div>
-              </label>
-            ))}
-          </div>
+          <p className="text-sm font-medium text-gray-700 mb-2">
+            Companies ({PRESET_BOARDS.length} Greenhouse boards)
+          </p>
+          <PresetBoardPicker
+            selected={selected}
+            onToggle={toggleBoard}
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

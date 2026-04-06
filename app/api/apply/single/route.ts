@@ -60,6 +60,7 @@ export async function POST(request: Request) {
       status: result.status,
       errorMessage: result.errorMessage || null,
       applicationData: {
+        source: 'single',
         template: {
           fullName: template.fullName,
           email: template.email,
