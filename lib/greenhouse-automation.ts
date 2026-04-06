@@ -1,5 +1,6 @@
 import puppeteer, { Browser, Page } from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
+import { runExclusiveChromeAutomation } from './chrome-automation-queue';
 import { getResumeForAutomation } from './storage';
 import { generateFieldAnswers, AIFieldAnswer } from './ai-form-filler';
 import { fetchGreenhouseSecurityCode, ImapConfig } from './email-checker';
@@ -45,6 +46,11 @@ export interface ApplicationResult {
   /** Set for batch applies so history can store the per-job link */
   jobUrl?: string;
 }
+
+/** When `reuseBrowser` is set, `applyToSingleJob` opens one tab and does not close the browser (batch caller owns it). */
+export type ApplyToSingleJobOptions = {
+  reuseBrowser?: Browser;
+};
 
 /** Default max jobs per dashboard batch apply request */
 export const BATCH_DEFAULT_MAX_JOBS = 50;
@@ -2120,43 +2126,52 @@ async function navigateToApplicationForm(page: Page): Promise<boolean> {
 }
 
 /**
- * Apply to a single Greenhouse job using a headless browser
+ * Apply to a single Greenhouse job using a headless browser.
+ * Without `reuseBrowser`, launches Chrome and queues behind {@link runExclusiveChromeAutomation}.
+ * With `reuseBrowser`, uses one tab only; caller must close the browser after all jobs.
  */
 export async function applyToSingleJob(
   jobUrl: string,
-  template: ApplicationTemplate
+  template: ApplicationTemplate,
+  options?: ApplyToSingleJobOptions
 ): Promise<ApplicationResult> {
-  let browser: Browser | null = null;
-  let resumeTmpPath: string | null = null;
+  const execute = async (): Promise<ApplicationResult> => {
+    let browser: Browser | null = options?.reuseBrowser ?? null;
+    let page: Page | null = null;
+    let resumeTmpPath: string | null = null;
+    const weOwnBrowser = !options?.reuseBrowser;
 
-  try {
-    /** Refined after navigation (redirects / embedded Greenhouse discovery). */
-    let parsed = parseGreenhouseUrl(jobUrl);
+    try {
+      /** Refined after navigation (redirects / embedded Greenhouse discovery). */
+      let parsed = parseGreenhouseUrl(jobUrl);
 
-    // Resolve resume: copy local file or download from signed URL into a temp path (always temp so finally can unlink safely)
-    if (template.resumePath) {
-      try {
-        const source = await getResumeForAutomation(template.resumePath);
-        const baseName = template.resumeFileName || 'resume.pdf';
-        if (source?.kind === 'path') {
-          const tmpDir = os.tmpdir();
-          resumeTmpPath = path.join(
-            tmpDir,
-            `resume_${Date.now()}_${baseName.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-          );
-          fs.copyFileSync(source.path, resumeTmpPath);
-        } else if (source?.kind === 'url') {
-          resumeTmpPath = await downloadToTempFile(source.url, baseName);
+      // Resolve resume: copy local file or download from signed URL into a temp path (always temp so finally can unlink safely)
+      if (template.resumePath) {
+        try {
+          const source = await getResumeForAutomation(template.resumePath);
+          const baseName = template.resumeFileName || 'resume.pdf';
+          if (source?.kind === 'path') {
+            const tmpDir = os.tmpdir();
+            resumeTmpPath = path.join(
+              tmpDir,
+              `resume_${Date.now()}_${baseName.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+            );
+            fs.copyFileSync(source.path, resumeTmpPath);
+          } else if (source?.kind === 'url') {
+            resumeTmpPath = await downloadToTempFile(source.url, baseName);
+          }
+        } catch (error) {
+          console.error('Error preparing resume for upload:', error);
         }
-      } catch (error) {
-        console.error('Error preparing resume for upload:', error);
       }
-    }
 
-    // Launch headless browser
-    console.log(`Launching headless browser for: ${jobUrl}`);
-    browser = await launchBrowser();
-    const page = await browser.newPage();
+      if (!browser) {
+        console.log(`Launching headless browser for: ${jobUrl}`);
+        browser = await launchBrowser();
+      } else {
+        console.log(`Reusing shared browser for job: ${jobUrl}`);
+      }
+      page = await browser.newPage();
 
     // Set a realistic user agent
     await page.setUserAgent(
@@ -2427,27 +2442,40 @@ export async function applyToSingleJob(
       filledFields: allFilledFields,
       securityCode: retrievedSecurityCode,
     };
-  } catch (error: any) {
-    console.error('Application error:', error);
-    return {
-      success: false,
-      jobInfo: {
-        jobTitle: 'Unknown',
-        companyName: 'Unknown',
-        location: 'Unknown',
-        department: 'Unknown',
-      },
-      status: 'failed',
-      errorMessage: error?.message || 'Unknown error occurred',
-    };
-  } finally {
-    if (browser) {
-      await browser.close().catch(() => {});
+    } catch (error: any) {
+      console.error('Application error:', error);
+      return {
+        success: false,
+        jobInfo: {
+          jobTitle: 'Unknown',
+          companyName: 'Unknown',
+          location: 'Unknown',
+          department: 'Unknown',
+        },
+        status: 'failed',
+        errorMessage: error?.message || 'Unknown error occurred',
+      };
+    } finally {
+      if (page) {
+        await page.close().catch((err) =>
+          console.warn('[Puppeteer] page.close failed:', err)
+        );
+      }
+      if (browser && weOwnBrowser) {
+        await browser.close().catch((err) =>
+          console.warn('[Puppeteer] browser.close failed:', err)
+        );
+      }
+      if (resumeTmpPath) {
+        cleanupTempFile(resumeTmpPath);
+      }
     }
-    if (resumeTmpPath) {
-      cleanupTempFile(resumeTmpPath);
-    }
+  };
+
+  if (options?.reuseBrowser) {
+    return execute();
   }
+  return runExclusiveChromeAutomation(execute);
 }
 
 /**
@@ -2470,9 +2498,10 @@ export async function applyToBatchJobs(
     maxJobs?: number;
   }
 ): Promise<ApplicationResult[]> {
-  const results: ApplicationResult[] = [];
+  return runExclusiveChromeAutomation(async () => {
+    const results: ApplicationResult[] = [];
 
-  try {
+    try {
     // Extract board token from URL
     const boardToken = extractBoardToken(boardUrl);
     if (!boardToken) {
@@ -2563,33 +2592,45 @@ export async function applyToBatchJobs(
     const maxJobs = options?.maxJobs ?? BATCH_DEFAULT_MAX_JOBS;
     const limitedJobs = filteredJobs.slice(0, maxJobs);
     console.log(
-      `Found ${filteredJobs.length} matching jobs, applying to ${limitedJobs.length}`
+      `Found ${filteredJobs.length} matching jobs, applying to ${limitedJobs.length} (one shared browser)`
     );
 
-    for (const job of limitedJobs) {
-      const jobUrl =
-        job.absolute_url ||
-        `https://boards.greenhouse.io/${boardToken}/jobs/${job.id}`;
+    let batchBrowser: Browser | null = null;
+    try {
+      batchBrowser = await launchBrowser();
+      for (const job of limitedJobs) {
+        const jobUrl =
+          job.absolute_url ||
+          `https://boards.greenhouse.io/${boardToken}/jobs/${job.id}`;
 
-      const result = await applyToSingleJob(jobUrl, template);
-      result.jobUrl = jobUrl;
+        const result = await applyToSingleJob(jobUrl, template, {
+          reuseBrowser: batchBrowser,
+        });
+        result.jobUrl = jobUrl;
 
-      // Override with API data
-      result.jobInfo = {
-        jobTitle: job.title,
-        companyName: boardData.name || boardToken,
-        location: job.location?.name || 'Unknown',
-        department: job.departments?.[0]?.name || 'Unknown',
-      };
+        // Override with API data
+        result.jobInfo = {
+          jobTitle: job.title,
+          companyName: boardData.name || boardToken,
+          location: job.location?.name || 'Unknown',
+          department: job.departments?.[0]?.name || 'Unknown',
+        };
 
-      results.push(result);
+        results.push(result);
 
-      // Delay between applications
-      await new Promise((r) => setTimeout(r, 3000));
+        // Delay between applications
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+    } finally {
+      if (batchBrowser) {
+        await batchBrowser.close().catch((err) =>
+          console.warn('[Puppeteer] batch browser.close failed:', err)
+        );
+      }
     }
 
     return results;
-  } catch (error: any) {
+    } catch (error: any) {
     console.error('Batch application error:', error);
     if (results.length === 0) {
       results.push({
@@ -2605,7 +2646,8 @@ export async function applyToBatchJobs(
       });
     }
     return results;
-  }
+    }
+  });
 }
 
 /**

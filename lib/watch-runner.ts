@@ -12,8 +12,15 @@ import {
 } from '@/lib/greenhouse-automation';
 import { getPresetBoardById } from '@/lib/preset-boards';
 
-/** Max jobs per board per watch/cron run (avoid timeouts) */
-export const WATCH_MAX_JOBS_PER_BOARD = 5;
+/**
+ * Max jobs per board per watch/cron run (lower = less RAM / Chrome time per tick).
+ * Override with env `WATCH_MAX_JOBS_PER_BOARD` (integer 1–20); default 3.
+ */
+const _watchMaxParsed = parseInt(process.env.WATCH_MAX_JOBS_PER_BOARD || '', 10);
+export const WATCH_MAX_JOBS_PER_BOARD =
+  Number.isFinite(_watchMaxParsed) && _watchMaxParsed >= 1 && _watchMaxParsed <= 20
+    ? _watchMaxParsed
+    : 3;
 
 function collectKeysFromResults(results: ApplicationResult[]): string[] {
   const keys: string[] = [];

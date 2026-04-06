@@ -20,11 +20,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local uploads (resumes)
-uploads/
+# # local uploads (resumes)
+# uploads/
 
-# persisted app data (users, templates, history)
-data/store.json
+# # persisted app data (users, templates, history)
+# data/store.json
 
 *.tsbuildinfo
 

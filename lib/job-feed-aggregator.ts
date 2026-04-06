@@ -1,4 +1,5 @@
 import { launchBrowser } from '@/lib/greenhouse-automation';
+import { runExclusiveChromeAutomation } from '@/lib/chrome-automation-queue';
 import { scrapeGreenhouseBoardJobList } from '@/lib/greenhouse-board-scraper';
 import { JOB_BOARD_DIRECTORY } from '@/lib/job-board-directory';
 import type { CachedJobRow, JobFeedCache } from '@/lib/json-store';
@@ -19,62 +20,66 @@ export async function refreshJobFeedCache(): Promise<{
   jobCount: number;
   durationMs: number;
 }> {
-  const start = Date.now();
-  const boardErrors: { boardId: string; message: string }[] = [];
-  const jobs: CachedJobRow[] = [];
+  return runExclusiveChromeAutomation(async () => {
+    const start = Date.now();
+    const boardErrors: { boardId: string; message: string }[] = [];
+    const jobs: CachedJobRow[] = [];
 
-  const browser = await launchBrowser();
-  try {
-    for (const entry of JOB_BOARD_DIRECTORY) {
-      const { rows, error } = await scrapeGreenhouseBoardJobList(browser, entry);
-      if (error || rows.length === 0) {
-        boardErrors.push({
-          boardId: entry.id,
-          message: error || 'No jobs scraped',
-        });
-        continue;
+    const browser = await launchBrowser();
+    try {
+      for (const entry of JOB_BOARD_DIRECTORY) {
+        const { rows, error } = await scrapeGreenhouseBoardJobList(browser, entry);
+        if (error || rows.length === 0) {
+          boardErrors.push({
+            boardId: entry.id,
+            message: error || 'No jobs scraped',
+          });
+          continue;
+        }
+        jobs.push(...rows);
       }
-      jobs.push(...rows);
+    } finally {
+      await browser.close().catch((err) =>
+        console.warn('[Puppeteer] job-feed browser.close failed:', err)
+      );
     }
-  } finally {
-    await browser.close().catch(() => {});
-  }
 
-  const boardsFailed = boardErrors.length;
-  const boardsOk = JOB_BOARD_DIRECTORY.length - boardsFailed;
+    const boardsFailed = boardErrors.length;
+    const boardsOk = JOB_BOARD_DIRECTORY.length - boardsFailed;
 
-  const prev = getJobFeedCacheSync();
-  const firstSeenByJobKey: Record<string, string> = {
-    ...(prev?.firstSeenByJobKey ?? {}),
-  };
-  const nowIso = new Date().toISOString();
+    const prev = getJobFeedCacheSync();
+    const firstSeenByJobKey: Record<string, string> = {
+      ...(prev?.firstSeenByJobKey ?? {}),
+    };
+    const nowIso = new Date().toISOString();
 
-  for (const row of jobs) {
-    const k = stableJobKey(row);
-    const prior = firstSeenByJobKey[k];
-    if (prior) {
-      row.firstFoundAt = prior;
-    } else {
-      firstSeenByJobKey[k] = nowIso;
-      row.firstFoundAt = nowIso;
+    for (const row of jobs) {
+      const k = stableJobKey(row);
+      const prior = firstSeenByJobKey[k];
+      if (prior) {
+        row.firstFoundAt = prior;
+      } else {
+        firstSeenByJobKey[k] = nowIso;
+        row.firstFoundAt = nowIso;
+      }
     }
-  }
 
-  const cache: JobFeedCache = {
-    updatedAt: nowIso,
-    boardsScanned: JOB_BOARD_DIRECTORY.length,
-    boardsFailed,
-    boardErrors,
-    jobs,
-    firstSeenByJobKey,
-  };
+    const cache: JobFeedCache = {
+      updatedAt: nowIso,
+      boardsScanned: JOB_BOARD_DIRECTORY.length,
+      boardsFailed,
+      boardErrors,
+      jobs,
+      firstSeenByJobKey,
+    };
 
-  await setJobFeedCache(cache);
+    await setJobFeedCache(cache);
 
-  return {
-    boardsOk,
-    boardsFailed,
-    jobCount: jobs.length,
-    durationMs: Date.now() - start,
-  };
+    return {
+      boardsOk,
+      boardsFailed,
+      jobCount: jobs.length,
+      durationMs: Date.now() - start,
+    };
+  });
 }

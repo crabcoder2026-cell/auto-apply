@@ -33,6 +33,12 @@ Optional for Auto Search job feed (Chrome scrape):
 |----------|---------|
 | `CHROME_PATH` | `/usr/bin/google-chrome-stable` |
 
+Optional for Auto pilot (Next.js process env, not required for curl):
+
+| Variable | Example | Notes |
+|----------|---------|--------|
+| `WATCH_MAX_JOBS_PER_BOARD` | `3` | Integer 1–20; caps jobs processed per board per watch run (default **3**). Lower if the server is tight on RAM. |
+
 Set on the **Node/systemd process** that runs `next start`, not only in the cron env file, if the app needs Chrome for `/api/cron/job-feed`.
 
 **Permissions:** restrict who can read secrets:
@@ -115,6 +121,8 @@ Use **absolute paths** to your clone and env file:
 ```
 
 Replace `/home/ubuntu/auto-apply` with your real deploy path.
+
+**Stagger vs overlap:** The app serializes Chrome work in a single queue (watch, job-feed, and applies wait on each other), but long runs still queue up. On small instances, **offset** the job-feed minute from watch so a heavy job-feed scrape is less likely to start right after a long watch tick—for example use `7,37 * * * *` for job-feed instead of `*/30 * * * *` (both are roughly every 30 minutes; adjust to your schedule). Set **`WATCH_MAX_JOBS_PER_BOARD`** on the Next.js process if you need fewer jobs per board per run.
 
 ## 5. Chrome on EC2 (job-feed)
 
