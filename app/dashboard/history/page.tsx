@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { History, ExternalLink, Search, Filter, Loader2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
@@ -23,32 +23,32 @@ export default function HistoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  useEffect(() => {
-    fetchHistory();
-  }, []);
-
-  useEffect(() => {
-    filterApplications();
-  }, [searchTerm, statusFilter, applications]);
-
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     try {
-      const response = await fetch('/api/history');
+      const response = await fetch('/api/history', { cache: 'no-store' });
       if (response.ok) {
         const data = await response.json();
         setApplications(data?.applications || []);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching history:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const filterApplications = () => {
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
+
+  useEffect(() => {
+    const onFocus = () => fetchHistory();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [fetchHistory]);
+
+  useEffect(() => {
     let filtered = applications;
-
-    // Apply search filter
     if (searchTerm) {
       filtered = filtered.filter(
         (app) =>
@@ -56,14 +56,11 @@ export default function HistoryPage() {
           app.companyName.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-
-    // Apply status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter((app) => app.status === statusFilter);
     }
-
     setFilteredApplications(filtered);
-  };
+  }, [searchTerm, statusFilter, applications]);
 
   const getStatusBadge = (status: string) => {
     const badges = {

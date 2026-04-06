@@ -20,7 +20,10 @@ export async function GET() {
 
     const applications = await listApplicationHistory(userId);
 
-    return NextResponse.json({ applications });
+    return NextResponse.json(
+      { applications },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   } catch (error: unknown) {
     console.error('Error fetching history:', error);
     return NextResponse.json(

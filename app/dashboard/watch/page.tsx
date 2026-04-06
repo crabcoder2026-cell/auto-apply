@@ -46,7 +46,7 @@ export default function WatchPage() {
   const load = useCallback(async () => {
     setError('');
     try {
-      const res = await fetch('/api/watch');
+      const res = await fetch('/api/watch', { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load');
       const w = data as WatchState;
@@ -72,6 +72,21 @@ export default function WatchPage() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  /** Cron updates last run on the server; refresh status while this tab is open */
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return;
+      load();
+    };
+    const id = window.setInterval(tick, 90_000);
+    const onVis = () => tick();
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+    };
   }, [load]);
 
   const toggleBoard = (id: string) => {

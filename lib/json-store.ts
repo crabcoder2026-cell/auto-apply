@@ -304,7 +304,8 @@ export async function listApplicationHistory(
   userId: string
 ): Promise<JsonApplicationHistory[]> {
   const store = readStoreSync();
-  const rows = store.applicationHistory.filter((h) => h.userId === userId);
+  const uid = String(userId);
+  const rows = store.applicationHistory.filter((h) => String(h.userId) === uid);
   rows.sort(
     (a, b) =>
       new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime()
@@ -317,8 +318,10 @@ export async function countHistoryByUser(
   status?: string
 ): Promise<number> {
   const store = readStoreSync();
+  const uid = String(userId);
   return store.applicationHistory.filter(
-    (h) => h.userId === userId && (status == null || h.status === status)
+    (h) =>
+      String(h.userId) === uid && (status == null || h.status === status)
   ).length;
 }
 

@@ -16,10 +16,13 @@ export async function GET() {
 
     const cfg = await getWatchConfig(userId);
     const { appliedJobKeys, ...rest } = cfg;
-    return NextResponse.json({
-      ...rest,
-      appliedJobKeysCount: appliedJobKeys.length,
-    });
+    return NextResponse.json(
+      {
+        ...rest,
+        appliedJobKeysCount: appliedJobKeys.length,
+      },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   } catch (e: unknown) {
     console.error('GET /api/watch:', e);
     return NextResponse.json(
@@ -56,10 +59,13 @@ export async function POST(request: Request) {
     });
 
     const { appliedJobKeys, ...rest } = row;
-    return NextResponse.json({
-      ...rest,
-      appliedJobKeysCount: appliedJobKeys.length,
-    });
+    return NextResponse.json(
+      {
+        ...rest,
+        appliedJobKeysCount: appliedJobKeys.length,
+      },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   } catch (e: unknown) {
     console.error('POST /api/watch:', e);
     return NextResponse.json(
