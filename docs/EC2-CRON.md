@@ -1,5 +1,7 @@
 # Cron on EC2 (Auto pilot + Auto Search)
 
+**Convention:** Manual commands below assume your shell is already in the **repo root** (your `auto-apply` folder). No `cd` needed — use `./scripts/...` and `.env.production` in the current directory.
+
 Your Next.js app does not wake itself. On EC2 you schedule HTTP calls to the protected cron routes using the same **`CRON_SECRET`** and **`NEXTAUTH_URL`** as the running server.
 
 The app must stay running after you close SSH — use **PM2** or **systemd** ([EC2-KEEP-SERVER-UP.md](./EC2-KEEP-SERVER-UP.md)).
@@ -61,7 +63,7 @@ The cron scripts read **`CRON_SECRET` and `NEXTAUTH_URL` from the env file you p
 1. **Add the line to that file** on the server (same secret the app uses):
 
    ```bash
-   nano /home/ec2-user/auto-apply/.env.production
+   nano .env.production
    ```
 
    Ensure you have exactly (no spaces around `=`):
@@ -77,12 +79,16 @@ The cron scripts read **`CRON_SECRET` and `NEXTAUTH_URL` from the env file you p
 
 ## 3. Test manually (on EC2)
 
-```bash
-cd /path/to/auto-apply
+From the repo root:
 
-# If using project .env.production:
-./scripts/ec2-cron-watch.sh /path/to/auto-apply/.env.production
-./scripts/ec2-cron-job-feed.sh /path/to/auto-apply/.env.production
+```bash
+# Default: load secrets from ./.env.production
+./scripts/ec2-cron-watch.sh
+./scripts/ec2-cron-job-feed.sh
+
+# Or pass the env file explicitly (still from repo root):
+./scripts/ec2-cron-watch.sh .env.production
+./scripts/ec2-cron-job-feed.sh .env.production
 
 # Or if using /etc/auto-apply/cron.env:
 export CRON_ENV_FILE=/etc/auto-apply/cron.env

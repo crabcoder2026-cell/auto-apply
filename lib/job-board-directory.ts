@@ -1,6 +1,6 @@
 /**
  * Greenhouse boards scraped for Auto Search (job discovery).
- * Currently only Airbnb; add entries to include more boards.
+ * Currently only Figma; add entries to include more boards.
  */
 
 export interface JobBoardDirectoryEntry {
@@ -14,10 +14,10 @@ export interface JobBoardDirectoryEntry {
 
 export const JOB_BOARD_DIRECTORY: JobBoardDirectoryEntry[] = [
   {
-    id: 'airbnb',
-    displayName: 'Airbnb',
-    category: 'Travel / Homesharing',
-    boardUrl: 'https://boards.greenhouse.io/airbnb',
+    id: 'figma',
+    displayName: 'Figma',
+    category: 'Design / Collaboration',
+    boardUrl: 'https://boards.greenhouse.io/figma',
   },
 ];
 

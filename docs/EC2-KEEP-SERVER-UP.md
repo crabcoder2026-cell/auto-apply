@@ -1,5 +1,7 @@
 # Keep Next.js running on EC2 after you close SSH
 
+**Convention:** Commands that start the app assume your shell is already in the **repo root** (`auto-apply`). You do not need `cd` into that folder first.
+
 When you run `npm run start` in an SSH session, it is tied to that shell. **Closing the terminal sends SIGHUP and stops the server.**
 
 Use one of these patterns.
@@ -21,11 +23,10 @@ The **`ecosystem.config.cjs`** in this repo starts **Next directly with Node** a
    CRON_SECRET=...
    ```
 
-2. Install PM2 and start from the app directory (after `npm run build`):
+2. Install PM2 and start from the repo root (after `npm run build`):
 
 ```bash
 sudo npm install -g pm2
-cd /home/ec2-user/auto-apply
 pm2 delete auto-apply 2>/dev/null || true
 pm2 start ecosystem.config.cjs
 pm2 save
@@ -69,7 +70,6 @@ pm2 env 0
 ### Alternative: source then start (no ecosystem file)
 
 ```bash
-cd /home/ec2-user/auto-apply
 set -a && source .env.production && set +a
 pm2 start npm --name auto-apply -- run start -- -H 0.0.0.0 -p 3001
 pm2 save
@@ -133,7 +133,7 @@ Survives **disconnect** but not a polished production setup (reboot kills it unl
 
 ```bash
 tmux new -s app
-cd /home/ec2-user/auto-apply && npm run start -- -H 0.0.0.0 -p 3001
+npm run start -- -H 0.0.0.0 -p 3001
 # Detach: Ctrl+B then D
 ```
 
