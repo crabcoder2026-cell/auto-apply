@@ -1,7 +1,30 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
 import { Navbar } from '@/components/navbar';
+import {
+  useInFlightBannerMessage,
+  useInFlightBannerVisible,
+} from '@/lib/in-flight';
+
+function InFlightBanner() {
+  const visible = useInFlightBannerVisible();
+  const message = useInFlightBannerMessage();
+  if (!visible || !message) return null;
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="sticky top-0 z-[60] border-b border-primary/30 bg-primary/95 px-4 py-2.5 text-center text-sm font-medium text-primary-foreground shadow-md backdrop-blur-sm"
+    >
+      <span className="inline-flex items-center justify-center gap-2">
+        <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+        {message}
+      </span>
+    </div>
+  );
+}
 
 export function DashboardChrome({ children }: { children: React.ReactNode }) {
   return (
@@ -32,6 +55,7 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
         transition={{ delay: 0.08, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         className="relative z-10 mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-12 lg:px-8 lg:py-16"
       >
+        <InFlightBanner />
         {children}
       </motion.main>
     </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { History, ExternalLink, Search, Filter, Loader2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { runInFlight } from '@/lib/in-flight';
 
 interface Application {
   id: string;
@@ -52,11 +53,13 @@ export default function HistoryPage() {
 
   const fetchHistory = useCallback(async () => {
     try {
-      const response = await fetch('/api/history', { cache: 'no-store' });
-      if (response.ok) {
-        const data = await response.json();
-        setApplications(data?.applications || []);
-      }
+      await runInFlight('history:fetch', async () => {
+        const response = await fetch('/api/history', { cache: 'no-store' });
+        if (response.ok) {
+          const data = await response.json();
+          setApplications(data?.applications || []);
+        }
+      });
     } catch (error: unknown) {
       console.error('Error fetching history:', error);
     } finally {

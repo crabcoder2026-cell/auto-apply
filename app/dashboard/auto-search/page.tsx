@@ -12,6 +12,7 @@ import {
 import { ApplicationStatusBadge } from '@/components/application-status-badge';
 import { JOB_BOARD_DIRECTORY } from '@/lib/job-board-directory';
 import type { CachedJobRow } from '@/lib/json-store';
+import { runInFlight, useInFlight, useInFlightMeta } from '@/lib/in-flight';
 
 interface HistoryRow {
   jobUrl: string;
@@ -61,8 +62,12 @@ export default function AutoSearchPage() {
   const [boardId, setBoardId] = useState('');
 
   const [history, setHistory] = useState<HistoryRow[]>([]);
-  const [applyingUrl, setApplyingUrl] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const applyBusy = useInFlight('apply:auto');
+  const applyTargetUrl = useInFlightMeta('apply:auto');
+  const fetchBusy = useInFlight('auto-search:fetch');
+  const initialBusy = useInFlight('auto-search:initial');
+  const listOrFetchBusy = loading || fetchBusy || initialBusy;
 
   const statusByUrl = useMemo(
     () => buildHistoryStatusMap(history),
@@ -116,8 +121,10 @@ export default function AutoSearchPage() {
       setLoading(true);
       setError('');
       try {
-        await fetchJobsWithFilters('', '', '', '');
-        await loadHistory();
+        await runInFlight('auto-search:initial', async () => {
+          await fetchJobsWithFilters('', '', '', '');
+          await loadHistory();
+        });
       } catch (e: unknown) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'Failed to load');
@@ -134,39 +141,44 @@ export default function AutoSearchPage() {
   useEffect(() => {
     const id = window.setInterval(() => {
       const f = filtersRef.current;
-      fetchJobsWithFilters(f.keywords, f.location, f.department, f.boardId).catch(
-        () => {}
-      );
-      loadHistory();
+      runInFlight('auto-search:fetch', async () => {
+        await fetchJobsWithFilters(f.keywords, f.location, f.department, f.boardId);
+        await loadHistory();
+      }).catch(() => {});
     }, 30 * 60 * 1000);
     return () => clearInterval(id);
   }, [fetchJobsWithFilters, loadHistory]);
 
   const onApply = async (jobUrl: string) => {
     setApplyError(null);
-    setApplyingUrl(jobUrl);
     try {
-      const res = await fetch('/api/apply/single', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobUrl }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || data.details || 'Apply failed');
-      await loadHistory();
+      await runInFlight(
+        'apply:auto',
+        async () => {
+          const res = await fetch('/api/apply/single', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jobUrl }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || data.details || 'Apply failed');
+          await loadHistory();
+        },
+        { meta: jobUrl }
+      );
     } catch (e: unknown) {
       setApplyError(e instanceof Error ? e.message : 'Apply failed');
-    } finally {
-      setApplyingUrl(null);
     }
   };
 
   const onSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+    setLoading(true);
     try {
-      await fetchJobsWithFilters(keywords, location, department, boardId);
+      await runInFlight('auto-search:fetch', async () => {
+        await fetchJobsWithFilters(keywords, location, department, boardId);
+      });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load');
     } finally {
@@ -175,11 +187,13 @@ export default function AutoSearchPage() {
   };
 
   const refreshNow = async () => {
-    setLoading(true);
     setError('');
+    setLoading(true);
     try {
-      await fetchJobsWithFilters(keywords, location, department, boardId);
-      await loadHistory();
+      await runInFlight('auto-search:fetch', async () => {
+        await fetchJobsWithFilters(keywords, location, department, boardId);
+        await loadHistory();
+      });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load');
     } finally {
@@ -280,10 +294,10 @@ export default function AutoSearchPage() {
         <div className="flex flex-wrap gap-3 items-center">
           <button
             type="submit"
-            disabled={loading}
+            disabled={listOrFetchBusy}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-orange text-white rounded-lg font-medium hover:bg-brand-orange-hover disabled:opacity-50"
           >
-            {loading ? (
+            {listOrFetchBusy ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Search className="h-4 w-4" />
@@ -293,10 +307,10 @@ export default function AutoSearchPage() {
           <button
             type="button"
             onClick={() => refreshNow()}
-            disabled={loading}
+            disabled={listOrFetchBusy}
             className="inline-flex items-center gap-2 px-4 py-2.5 border border-brand-green text-brand-green rounded-lg font-medium hover:bg-brand-green-muted disabled:opacity-50"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${listOrFetchBusy ? 'animate-spin' : ''}`} />
             Refresh now
           </button>
           <span className="text-sm text-muted-foreground">
@@ -374,7 +388,7 @@ export default function AutoSearchPage() {
               </tr>
             </thead>
             <tbody>
-              {loading && jobs.length === 0 ? (
+              {listOrFetchBusy && jobs.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-16 text-center text-muted-foreground">
                     <Loader2 className="h-8 w-8 animate-spin text-brand-green mx-auto" />
@@ -438,11 +452,11 @@ export default function AutoSearchPage() {
                           </a>
                           <button
                             type="button"
-                            disabled={!!applyingUrl}
+                            disabled={applyBusy}
                             onClick={() => onApply(job.jobUrl)}
                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-brand-green text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
                           >
-                            {applyingUrl === job.jobUrl ? (
+                            {applyBusy && applyTargetUrl === job.jobUrl ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : (
                               <Send className="h-3.5 w-3.5" />

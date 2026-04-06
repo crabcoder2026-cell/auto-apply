@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Save, Upload, Loader2, CheckCircle, FileText, Mail, ShieldCheck } from 'lucide-react';
+import { runInFlight, useInFlight } from '@/lib/in-flight';
 
 interface Template {
   id: string;
@@ -22,8 +23,9 @@ interface Template {
 export default function TemplatePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const saving = useInFlight('template:save');
+  const uploading = useInFlight('template:upload');
+  const testingImap = useInFlight('template:imap-test');
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
@@ -45,7 +47,6 @@ export default function TemplatePage() {
     imapPort: '993',
     imapPassword: '',
   });
-  const [testingImap, setTestingImap] = useState(false);
   const [imapTestResult, setImapTestResult] = useState<{ success: boolean; error?: string } | null>(null);
   const [storageDriver, setStorageDriver] = useState<'local' | 's3' | null>(null);
 
@@ -123,105 +124,103 @@ export default function TemplatePage() {
       return;
     }
 
-    setUploading(true);
     setError('');
 
     try {
-      if (storageDriver === 'local') {
-        const formData = new FormData();
-        formData.append('file', file);
-        const uploadResponse = await fetch('/api/upload/local', {
-          method: 'POST',
-          body: formData,
-        });
-        if (!uploadResponse.ok) {
-          const err = await uploadResponse.json().catch(() => ({}));
-          throw new Error(err.error || 'Failed to upload file');
+      await runInFlight('template:upload', async () => {
+        if (storageDriver === 'local') {
+          const formData = new FormData();
+          formData.append('file', file);
+          const uploadResponse = await fetch('/api/upload/local', {
+            method: 'POST',
+            body: formData,
+          });
+          if (!uploadResponse.ok) {
+            const err = await uploadResponse.json().catch(() => ({}));
+            throw new Error(err.error || 'Failed to upload file');
+          }
+          const { cloud_storage_path, resumeFileName } = await uploadResponse.json();
+          setFormData((prev) => ({
+            ...prev,
+            resumePath: cloud_storage_path,
+            resumeFileName: resumeFileName || file.name,
+          }));
+        } else {
+          const presignedResponse = await fetch('/api/upload/presigned', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileName: file.name,
+              contentType: file.type,
+              isPublic: false,
+            }),
+          });
+
+          if (!presignedResponse.ok) {
+            throw new Error('Failed to get upload URL');
+          }
+
+          const { uploadUrl, cloud_storage_path } = await presignedResponse.json();
+
+          const url = new URL(uploadUrl);
+          const signedHeaders = url.searchParams.get('X-Amz-SignedHeaders');
+          const needsContentDisposition = signedHeaders?.includes('content-disposition');
+
+          const uploadHeaders: HeadersInit = {
+            'Content-Type': file.type,
+          };
+
+          if (needsContentDisposition) {
+            uploadHeaders['Content-Disposition'] = 'attachment';
+          }
+
+          const uploadResponse = await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: uploadHeaders,
+            body: file,
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error('Failed to upload file');
+          }
+
+          setFormData((prev) => ({
+            ...prev,
+            resumePath: cloud_storage_path,
+            resumeFileName: file.name,
+          }));
         }
-        const { cloud_storage_path, resumeFileName } = await uploadResponse.json();
-        setFormData((prev) => ({
-          ...prev,
-          resumePath: cloud_storage_path,
-          resumeFileName: resumeFileName || file.name,
-        }));
-      } else {
-        const presignedResponse = await fetch('/api/upload/presigned', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileName: file.name,
-            contentType: file.type,
-            isPublic: false,
-          }),
-        });
-
-        if (!presignedResponse.ok) {
-          throw new Error('Failed to get upload URL');
-        }
-
-        const { uploadUrl, cloud_storage_path } = await presignedResponse.json();
-
-        const url = new URL(uploadUrl);
-        const signedHeaders = url.searchParams.get('X-Amz-SignedHeaders');
-        const needsContentDisposition = signedHeaders?.includes('content-disposition');
-
-        const uploadHeaders: HeadersInit = {
-          'Content-Type': file.type,
-        };
-
-        if (needsContentDisposition) {
-          uploadHeaders['Content-Disposition'] = 'attachment';
-        }
-
-        const uploadResponse = await fetch(uploadUrl, {
-          method: 'PUT',
-          headers: uploadHeaders,
-          body: file,
-        });
-
-        if (!uploadResponse.ok) {
-          throw new Error('Failed to upload file');
-        }
-
-        setFormData((prev) => ({
-          ...prev,
-          resumePath: cloud_storage_path,
-          resumeFileName: file.name,
-        }));
-      }
-    } catch (err: any) {
+      });
+    } catch (err: unknown) {
       console.error('Upload error:', err);
       setError('Failed to upload resume. Please try again.');
-    } finally {
-      setUploading(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setSaving(true);
     setSuccess(false);
 
     try {
-      const response = await fetch('/api/template', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+      await runInFlight('template:save', async () => {
+        const response = await fetch('/api/template', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save template');
+        }
+
+        setSuccess(true);
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 1500);
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to save template');
-      }
-
-      setSuccess(true);
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 1500);
-    } catch (err: any) {
+    } catch {
       setError('Failed to save template. Please try again.');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -294,7 +293,7 @@ export default function TemplatePage() {
                   accept=".pdf,.doc,.docx"
                   onChange={handleFileUpload}
                   className="hidden"
-                  disabled={uploading}
+                  disabled={uploading || saving || testingImap}
                 />
               </label>
             </div>
@@ -615,28 +614,27 @@ export default function TemplatePage() {
                 <button
                   type="button"
                   onClick={async () => {
-                    setTestingImap(true);
                     setImapTestResult(null);
                     try {
-                      const res = await fetch('/api/test-imap', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          imapHost: formData.imapHost,
-                          imapPort: formData.imapPort,
-                          email: formData.email,
-                          imapPassword: formData.imapPassword,
-                        }),
+                      await runInFlight('template:imap-test', async () => {
+                        const res = await fetch('/api/test-imap', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            imapHost: formData.imapHost,
+                            imapPort: formData.imapPort,
+                            email: formData.email,
+                            imapPassword: formData.imapPassword,
+                          }),
+                        });
+                        const result = await res.json();
+                        setImapTestResult(result);
                       });
-                      const result = await res.json();
-                      setImapTestResult(result);
                     } catch {
                       setImapTestResult({ success: false, error: 'Failed to test connection' });
-                    } finally {
-                      setTestingImap(false);
                     }
                   }}
-                  disabled={testingImap}
+                  disabled={testingImap || saving || uploading}
                   className="flex items-center space-x-2 px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted transition-colors text-sm font-medium disabled:opacity-50"
                 >
                   {testingImap ? (
@@ -666,7 +664,7 @@ export default function TemplatePage() {
           <div className="flex items-center space-x-4">
             <button
               type="submit"
-              disabled={saving || !formData.fullName || !formData.email || !formData.linkedinUrl || !formData.currentLocation || !formData.country}
+              disabled={saving || uploading || testingImap || !formData.fullName || !formData.email || !formData.linkedinUrl || !formData.currentLocation || !formData.country}
               className="flex items-center space-x-2 px-6 py-3 bg-brand-orange text-white rounded-lg hover:bg-brand-orange-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-orange disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
               {saving ? (

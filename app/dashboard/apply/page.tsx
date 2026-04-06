@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Send, Link as LinkIcon, Briefcase, Loader2, CheckCircle, XCircle, AlertCircle, FileText, Bot, User, Copy, Shield } from 'lucide-react';
 import { PRESET_BOARDS } from '@/lib/preset-boards';
 import { PresetBoardPicker } from '@/components/preset-board-picker';
+import { runInFlight, useInFlight } from '@/lib/in-flight';
 
 interface FilledField {
   field: string;
@@ -36,9 +37,11 @@ export default function ApplyPage() {
   const [keywords, setKeywords] = useState('');
   const [location, setLocation] = useState('');
   const [department, setDepartment] = useState('');
-  const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
+  const singleBusy = useInFlight('apply:single');
+  const batchBusy = useInFlight('apply:batch');
+  const loading = singleBusy || batchBusy;
 
   const handleSingleApply = async () => {
     if (!jobUrl.trim()) {
@@ -46,29 +49,28 @@ export default function ApplyPage() {
       return;
     }
 
-    setLoading(true);
     setError('');
     setResult(null);
 
     try {
-      const response = await fetch('/api/apply/single', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobUrl }),
+      await runInFlight('apply:single', async () => {
+        const response = await fetch('/api/apply/single', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobUrl }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to submit application');
+        }
+
+        setResult(data);
+        setJobUrl('');
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit application');
-      }
-
-      setResult(data);
-      setJobUrl('');
-    } catch (err: any) {
-      setError(err?.message || 'Failed to submit application');
-    } finally {
-      setLoading(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to submit application');
     }
   };
 
@@ -86,7 +88,6 @@ export default function ApplyPage() {
       return;
     }
 
-    setLoading(true);
     setError('');
     setResult(null);
 
@@ -97,34 +98,34 @@ export default function ApplyPage() {
     };
 
     try {
-      const response = await fetch(
-        usePresets ? '/api/apply/preset-batch' : '/api/apply/batch',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(
-            usePresets
-              ? { boardIds: presetIds, filters }
-              : { boardUrl, filters }
-          ),
+      await runInFlight('apply:batch', async () => {
+        const response = await fetch(
+          usePresets ? '/api/apply/preset-batch' : '/api/apply/batch',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(
+              usePresets
+                ? { boardIds: presetIds, filters }
+                : { boardUrl, filters }
+            ),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to submit applications');
         }
-      );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit applications');
-      }
-
-      setResult(data);
-      if (!usePresets) setBoardUrl('');
-      setKeywords('');
-      setLocation('');
-      setDepartment('');
-    } catch (err: any) {
-      setError(err?.message || 'Failed to submit applications');
-    } finally {
-      setLoading(false);
+        setResult(data);
+        if (!usePresets) setBoardUrl('');
+        setKeywords('');
+        setLocation('');
+        setDepartment('');
+      });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to submit applications');
     }
   };
 
@@ -171,23 +172,27 @@ export default function ApplyPage() {
       <div className="bg-card rounded-xl shadow-md p-6">
         <div className="flex space-x-4 mb-6">
           <button
+            type="button"
             onClick={() => setMode('single')}
+            disabled={loading}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2 ${
               mode === 'single'
                 ? 'bg-brand-orange text-white'
                 : 'bg-muted text-foreground hover:bg-muted'
-            }`}
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <LinkIcon className="h-5 w-5" />
             <span>Single Job</span>
           </button>
           <button
+            type="button"
             onClick={() => setMode('batch')}
+            disabled={loading}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2 ${
               mode === 'batch'
                 ? 'bg-brand-orange text-white'
                 : 'bg-muted text-foreground hover:bg-muted'
-            }`}
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <Briefcase className="h-5 w-5" />
             <span>Batch Application</span>

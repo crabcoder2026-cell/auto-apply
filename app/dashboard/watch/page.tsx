@@ -12,6 +12,7 @@ import {
 import Link from 'next/link';
 import { PRESET_BOARDS } from '@/lib/preset-boards';
 import { PresetBoardPicker } from '@/components/preset-board-picker';
+import { runInFlight, useInFlight } from '@/lib/in-flight';
 
 interface WatchState {
   enabled: boolean;
@@ -27,9 +28,9 @@ interface WatchState {
 
 export default function WatchPage() {
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
+  const saving = useInFlight('watch:save');
+  const running = useInFlight('watch:run');
   const [runMessage, setRunMessage] = useState('');
 
   const [enabled, setEnabled] = useState(false);
@@ -95,51 +96,49 @@ export default function WatchPage() {
   };
 
   const save = async () => {
-    setSaving(true);
     setError('');
     try {
-      const selectedBoardIds = PRESET_BOARDS.filter((b) => selected[b.id]).map(
-        (b) => b.id
-      );
-      const res = await fetch('/api/watch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          enabled,
-          selectedBoardIds,
-          keywords,
-          location,
-          department,
-        }),
+      await runInFlight('watch:save', async () => {
+        const selectedBoardIds = PRESET_BOARDS.filter((b) => selected[b.id]).map(
+          (b) => b.id
+        );
+        const res = await fetch('/api/watch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            enabled,
+            selectedBoardIds,
+            keywords,
+            location,
+            department,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Save failed');
+        setMeta((m) => ({
+          ...m,
+          appliedJobKeysCount: data.appliedJobKeysCount ?? m.appliedJobKeysCount,
+          updatedAt: data.updatedAt,
+        }));
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Save failed');
-      setMeta((m) => ({
-        ...m,
-        appliedJobKeysCount: data.appliedJobKeysCount ?? m.appliedJobKeysCount,
-        updatedAt: data.updatedAt,
-      }));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Save failed');
-    } finally {
-      setSaving(false);
     }
   };
 
   const runNow = async () => {
-    setRunning(true);
     setError('');
     setRunMessage('');
     try {
-      const res = await fetch('/api/watch/run', { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || data.details || 'Run failed');
-      setRunMessage(data.summary || 'Done');
-      await load();
+      await runInFlight('watch:run', async () => {
+        const res = await fetch('/api/watch/run', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.details || 'Run failed');
+        setRunMessage(data.summary || 'Done');
+        await load();
+      });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Run failed');
-    } finally {
-      setRunning(false);
     }
   };
 
@@ -179,7 +178,8 @@ export default function WatchPage() {
             type="checkbox"
             checked={enabled}
             onChange={(e) => setEnabled(e.target.checked)}
-            className="h-4 w-4 rounded border-input text-brand-orange focus:ring-brand-green"
+            disabled={saving || running}
+            className="h-4 w-4 rounded border-input text-brand-orange focus:ring-brand-green disabled:opacity-50"
           />
           <span className="font-medium text-foreground">
             Enable Auto pilot (scheduled auto-apply — requires cron setup below)
@@ -193,6 +193,7 @@ export default function WatchPage() {
           <PresetBoardPicker
             selected={selected}
             onToggle={toggleBoard}
+            disabled={saving || running}
           />
         </div>
 
@@ -206,7 +207,8 @@ export default function WatchPage() {
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
               placeholder="e.g. engineer, data"
-              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green"
+              disabled={saving || running}
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green disabled:opacity-50"
             />
           </div>
           <div>
@@ -218,7 +220,8 @@ export default function WatchPage() {
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="Optional"
-              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green"
+              disabled={saving || running}
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green disabled:opacity-50"
             />
           </div>
           <div>
@@ -230,7 +233,8 @@ export default function WatchPage() {
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
               placeholder="Optional"
-              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green"
+              disabled={saving || running}
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-brand-green disabled:opacity-50"
             />
           </div>
         </div>
@@ -239,7 +243,7 @@ export default function WatchPage() {
           <button
             type="button"
             onClick={save}
-            disabled={saving}
+            disabled={saving || running}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-orange text-white rounded-lg font-medium hover:bg-brand-orange-hover disabled:opacity-50"
           >
             {saving ? (
@@ -252,7 +256,7 @@ export default function WatchPage() {
           <button
             type="button"
             onClick={runNow}
-            disabled={running}
+            disabled={running || saving}
             className="inline-flex items-center gap-2 px-4 py-2.5 border border-brand-green text-brand-green rounded-lg font-medium hover:bg-brand-green-muted disabled:opacity-50"
           >
             {running ? (
