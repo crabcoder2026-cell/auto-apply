@@ -50,6 +50,12 @@ export interface ApplicationResult {
 export const BATCH_DEFAULT_MAX_JOBS = 50;
 
 /**
+ * Careers pages often never reach `networkidle` (analytics, websockets, ads).
+ * `load` + a generous timeout avoids spurious NavigationTimeout while the DOM is usable.
+ */
+const PAGE_GOTO_TIMEOUT_MS = 120_000;
+
+/**
  * Normalize job URLs so history vs API absolute_url match for deduplication.
  */
 export function normalizeJobUrlForDedupe(url: string): string {
@@ -2156,10 +2162,14 @@ export async function applyToSingleJob(
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     );
+    page.setDefaultNavigationTimeout(PAGE_GOTO_TIMEOUT_MS);
 
     // Navigate to the job page (may be a company careers site that embeds Greenhouse)
     console.log('Navigating to job page...');
-    await page.goto(jobUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.goto(jobUrl, {
+      waitUntil: 'load',
+      timeout: PAGE_GOTO_TIMEOUT_MS,
+    });
     await new Promise((r) => setTimeout(r, 2000));
 
     let hasGhForm = await mainFrameHasGreenhouseApplicationForm(page);
@@ -2167,7 +2177,10 @@ export async function applyToSingleJob(
       const discovered = await discoverGreenhouseApplicationUrl(page);
       if (discovered) {
         console.log('Opening embedded Greenhouse URL:', discovered);
-        await page.goto(discovered, { waitUntil: 'networkidle2', timeout: 30000 });
+        await page.goto(discovered, {
+          waitUntil: 'load',
+          timeout: PAGE_GOTO_TIMEOUT_MS,
+        });
         await new Promise((r) => setTimeout(r, 2000));
         hasGhForm = await mainFrameHasGreenhouseApplicationForm(page);
       }
