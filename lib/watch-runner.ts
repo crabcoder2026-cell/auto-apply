@@ -2,12 +2,15 @@ import {
   createApplicationHistory,
   getActiveTemplate,
   getWatchConfig,
+  listApplicationHistory,
   mergeAppliedJobKeys,
   upsertWatchConfig,
 } from '@/lib/json-store';
+import { normalizeStoredBoardJobKey } from '@/lib/board-job-dedupe';
 import {
   applyToBatchJobs,
-  extractBoardToken,
+  dedupeKeyFromJobUrl,
+  normalizeJobUrlForDedupe,
   type ApplicationResult,
 } from '@/lib/greenhouse-automation';
 import { getPresetBoardById } from '@/lib/preset-boards';
@@ -25,13 +28,13 @@ export const WATCH_MAX_JOBS_PER_BOARD =
 function collectKeysFromResults(results: ApplicationResult[]): string[] {
   const keys: string[] = [];
   for (const r of results) {
-    if (!r.jobUrl) continue;
-    const tok = extractBoardToken(r.jobUrl);
-    const m = r.jobUrl.match(/\/jobs\/(\d+)/);
-    if (tok && m) keys.push(`${tok}:${m[1]}`);
+    const k = dedupeKeyFromJobUrl(r.jobUrl);
+    if (k) keys.push(k);
   }
   return keys;
 }
+
+const HISTORY_STATUSES_SKIP_REAPPLY = new Set(['success', 'requires_manual']);
 
 /**
  * Run auto-apply for one user: selected preset boards, filters, dedupe against stored keys.
@@ -70,7 +73,19 @@ export async function runWatchForUser(userId: string): Promise<{
     };
   }
 
-  const dedupeSet = new Set(config.appliedJobKeys);
+  const dedupeSet = new Set(
+    config.appliedJobKeys.map((k) => normalizeStoredBoardJobKey(k))
+  );
+  const appliedJobUrls = new Set<string>();
+  const priorHistory = await listApplicationHistory(userId);
+  for (const h of priorHistory) {
+    if (!HISTORY_STATUSES_SKIP_REAPPLY.has(h.status)) continue;
+    const k = dedupeKeyFromJobUrl(h.jobUrl);
+    if (k) dedupeSet.add(k);
+    const nu = normalizeJobUrlForDedupe(h.jobUrl);
+    if (nu) appliedJobUrls.add(nu);
+    if (k) appliedJobUrls.add(k);
+  }
   const filters = {
     keywords: config.keywords?.trim() || undefined,
     location: config.location?.trim() || undefined,
@@ -89,7 +104,11 @@ export async function runWatchForUser(userId: string): Promise<{
       preset.url,
       template,
       filters,
-      { dedupeKeys: dedupeSet, maxJobs: WATCH_MAX_JOBS_PER_BOARD }
+      {
+        dedupeKeys: dedupeSet,
+        appliedJobUrls,
+        maxJobs: WATCH_MAX_JOBS_PER_BOARD,
+      }
     );
 
     for (const r of results) {
@@ -117,6 +136,14 @@ export async function runWatchForUser(userId: string): Promise<{
     for (const k of batchKeys) {
       newKeys.push(k);
       dedupeSet.add(k);
+    }
+    for (const r of results) {
+      if (r.jobUrl) {
+        const nu = normalizeJobUrlForDedupe(r.jobUrl);
+        if (nu) appliedJobUrls.add(nu);
+        const idk = dedupeKeyFromJobUrl(r.jobUrl);
+        if (idk) appliedJobUrls.add(idk);
+      }
     }
   }
 

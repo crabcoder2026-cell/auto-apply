@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
+import { normalizeStoredBoardJobKey } from '@/lib/board-job-dedupe';
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const STORE_FILE = path.join(DATA_DIR, 'store.json');
@@ -408,9 +409,11 @@ export async function mergeAppliedJobKeys(
     const idx = store.watchConfigs.findIndex((w) => w.userId === userId);
     const set = new Set<string>();
     if (idx >= 0) {
-      for (const k of store.watchConfigs[idx].appliedJobKeys) set.add(k);
+      for (const k of store.watchConfigs[idx].appliedJobKeys) {
+        set.add(normalizeStoredBoardJobKey(k));
+      }
     }
-    for (const k of newKeys) set.add(k);
+    for (const k of newKeys) set.add(normalizeStoredBoardJobKey(k));
     const merged = Array.from(set);
     if (idx === -1) {
       store.watchConfigs.push({

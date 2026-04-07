@@ -9,6 +9,7 @@ import {
 import {
   applyToBatchJobs,
   BATCH_DEFAULT_MAX_JOBS,
+  dedupeKeyFromJobUrl,
   normalizeJobUrlForDedupe,
 } from '@/lib/greenhouse-automation';
 import { getPresetBoardById } from '@/lib/preset-boards';
@@ -53,12 +54,14 @@ export async function POST(request: Request) {
     };
 
     const history = await listApplicationHistory(userId);
-    const appliedJobUrls = new Set(
-      history
-        .filter((h) => h.status === 'success')
-        .map((h) => normalizeJobUrlForDedupe(h.jobUrl))
-        .filter(Boolean)
-    );
+    const appliedJobUrls = new Set<string>();
+    for (const h of history) {
+      if (h.status !== 'success' && h.status !== 'requires_manual') continue;
+      const nu = normalizeJobUrlForDedupe(h.jobUrl);
+      if (nu) appliedJobUrls.add(nu);
+      const dk = dedupeKeyFromJobUrl(h.jobUrl);
+      if (dk) appliedJobUrls.add(dk);
+    }
 
     const allResults: Awaited<ReturnType<typeof applyToBatchJobs>> = [];
     let remaining = BATCH_DEFAULT_MAX_JOBS;
@@ -76,8 +79,12 @@ export async function POST(request: Request) {
       allResults.push(...results);
 
       for (const r of results) {
-        if (r.jobUrl)
-          appliedJobUrls.add(normalizeJobUrlForDedupe(r.jobUrl));
+        if (r.jobUrl) {
+          const nu = normalizeJobUrlForDedupe(r.jobUrl);
+          if (nu) appliedJobUrls.add(nu);
+          const dk = dedupeKeyFromJobUrl(r.jobUrl);
+          if (dk) appliedJobUrls.add(dk);
+        }
       }
       remaining -= results.filter((r) => Boolean(r.jobUrl)).length;
 

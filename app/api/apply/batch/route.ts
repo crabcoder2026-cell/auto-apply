@@ -9,6 +9,7 @@ import {
 import {
   applyToBatchJobs,
   BATCH_DEFAULT_MAX_JOBS,
+  dedupeKeyFromJobUrl,
   isValidJobPageUrl,
   normalizeJobUrlForDedupe,
   resolveGreenhouseBoardInputUrl,
@@ -67,12 +68,14 @@ export async function POST(request: Request) {
     }
 
     const history = await listApplicationHistory(userId);
-    const appliedJobUrls = new Set(
-      history
-        .filter((h) => h.status === 'success')
-        .map((h) => normalizeJobUrlForDedupe(h.jobUrl))
-        .filter(Boolean)
-    );
+    const appliedJobUrls = new Set<string>();
+    for (const h of history) {
+      if (h.status !== 'success' && h.status !== 'requires_manual') continue;
+      const nu = normalizeJobUrlForDedupe(h.jobUrl);
+      if (nu) appliedJobUrls.add(nu);
+      const dk = dedupeKeyFromJobUrl(h.jobUrl);
+      if (dk) appliedJobUrls.add(dk);
+    }
 
     const results = await applyToBatchJobs(resolvedBoardUrl, template, filters, {
       appliedJobUrls,

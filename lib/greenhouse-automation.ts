@@ -1,6 +1,7 @@
 import puppeteer, { Browser, Page } from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { runExclusiveChromeAutomation } from './chrome-automation-queue';
+import { stableBoardJobKey } from './board-job-dedupe';
 import { getResumeForAutomation } from './storage';
 import { generateFieldAnswers, AIFieldAnswer } from './ai-form-filler';
 import { fetchGreenhouseSecurityCode, ImapConfig } from './email-checker';
@@ -76,6 +77,10 @@ export function normalizeJobUrlForDedupe(url: string): string {
         ? 'https:'
         : u.protocol;
     const path = u.pathname.replace(/\/+$/, '') || '/';
+    // Same job posting often differs only by UTM/query between history and API `absolute_url`.
+    if (host.endsWith('greenhouse.io')) {
+      u.search = '';
+    }
     return `${proto}//${host}${path}${u.search}`;
   } catch {
     return trimmed.toLowerCase().replace(/\/+$/, '');
@@ -2562,7 +2567,7 @@ export async function applyToBatchJobs(
     if (options?.dedupeKeys && options.dedupeKeys.size > 0) {
       const dedupe = options.dedupeKeys;
       filteredJobs = filteredJobs.filter((j) => {
-        const key = `${boardToken}:${j.id}`;
+        const key = stableBoardJobKey(boardToken, j.id);
         return !dedupe.has(key);
       });
     }
@@ -2574,8 +2579,10 @@ export async function applyToBatchJobs(
         const jobUrl =
           j.absolute_url ||
           `https://boards.greenhouse.io/${boardToken}/jobs/${j.id}`;
-        const key = normalizeJobUrlForDedupe(jobUrl);
-        return !key || !applied.has(key);
+        const urlKey = normalizeJobUrlForDedupe(jobUrl);
+        const identityKey = stableBoardJobKey(boardToken, j.id);
+        if (applied.has(identityKey)) return false;
+        return !urlKey || !applied.has(urlKey);
       });
       if (before !== filteredJobs.length) {
         console.log(
@@ -2683,6 +2690,18 @@ export function extractBoardToken(url: string): string | null {
     if (m && m[1] !== 'embed') return m[1];
   }
   return null;
+}
+
+/**
+ * Stable key for Auto pilot / batch dedupe: `${boardToken}:${numericJobId}`.
+ * Matches {@link applyToBatchJobs} filter when using `dedupeKeys`.
+ */
+export function dedupeKeyFromJobUrl(jobUrl: string | null | undefined): string | null {
+  if (!jobUrl) return null;
+  const tok = extractBoardToken(jobUrl);
+  const m = jobUrl.match(/\/jobs\/(\d+)/);
+  if (!tok || !m) return null;
+  return stableBoardJobKey(tok, m[1]);
 }
 
 /**
