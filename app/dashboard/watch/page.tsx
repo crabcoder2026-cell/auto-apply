@@ -158,10 +158,14 @@ export default function WatchPage() {
           Auto pilot
         </h1>
         <p className="text-muted-foreground mt-2">
-          Auto pilot runs in the background on a schedule and sends applications for you
-          when new listings appear on your selected boards that match your keywords and
-          filters. It uses your saved profile template. Roles you have already applied to
-          are skipped so you do not duplicate.
+          Auto pilot uses the same shared job feed as{' '}
+          <Link href="/dashboard/auto-search" className="text-brand-green font-medium hover:underline">
+            Auto Search
+          </Link>{' '}
+          (refreshed by the job-feed cron). It applies to matching listings — you do not
+          need to scrape each company board separately. Leave all companies unchecked to
+          include every board in the directory, or pick specific companies. It uses your
+          saved profile template and skips roles you already applied to.
         </p>
         <p className="text-sm text-muted-foreground mt-3">
           For one-off applies without the schedule, use{' '}
@@ -189,6 +193,9 @@ export default function WatchPage() {
         <div>
           <p className="text-sm font-medium text-foreground mb-2">
             Companies ({PRESET_BOARDS.length} Greenhouse boards)
+          </p>
+          <p className="text-xs text-muted-foreground mb-2">
+            Leave none selected to run against all companies in the Auto Search directory.
           </p>
           <PresetBoardPicker
             selected={selected}

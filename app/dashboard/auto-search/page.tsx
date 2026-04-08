@@ -21,6 +21,7 @@ interface HistoryRow {
   jobUrl: string;
   status: string;
   appliedAt: string;
+  applicationData?: unknown;
 }
 
 function normalizeJobUrlForMatch(url: string): string {
@@ -46,6 +47,23 @@ function buildHistoryStatusMap(history: HistoryRow[]): Map<string, HistoryRow> {
     }
   }
   return map;
+}
+
+function JobApplyStatusCell({ hist }: { hist: HistoryRow | undefined }) {
+  if (!hist) {
+    return (
+      <span className="text-xs text-muted-foreground">Not applied</span>
+    );
+  }
+  const src = (hist.applicationData as { source?: string } | null)?.source;
+  if (src === 'watch' && hist.status === 'success') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-900 border border-emerald-200/80">
+        Auto pilot applied
+      </span>
+    );
+  }
+  return <ApplicationStatusBadge status={hist.status} />;
 }
 
 export default function AutoSearchPage() {
@@ -529,11 +547,7 @@ export default function AutoSearchPage() {
                           : '—'}
                       </td>
                       <td className="py-3 px-4">
-                        {hist ? (
-                          <ApplicationStatusBadge status={hist.status} />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Not applied</span>
-                        )}
+                        <JobApplyStatusCell hist={hist} />
                       </td>
                       <td className="py-3 px-4 text-right whitespace-nowrap">
                         <div className="inline-flex items-center gap-2 justify-end">

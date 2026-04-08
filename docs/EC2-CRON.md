@@ -37,7 +37,7 @@ Optional for Auto pilot (Next.js process env, not required for curl):
 
 | Variable | Example | Notes |
 |----------|---------|--------|
-| `WATCH_MAX_JOBS_PER_BOARD` | `3` | Integer 1–20; caps jobs processed per board per watch run (default **3**). Lower if the server is tight on RAM. |
+| `WATCH_MAX_JOBS_PER_RUN` | `30` | Integer 1–200; caps Auto pilot applications per run from the **Auto Search** job feed (default **30**). Requires job-feed cron so the feed is populated. Lower on small RAM. |
 
 Set on the **Node/systemd process** that runs `next start`, not only in the cron env file, if the app needs Chrome for `/api/cron/job-feed`.
 
@@ -122,7 +122,7 @@ Use **absolute paths** to your clone and env file:
 
 Replace `/home/ubuntu/auto-apply` with your real deploy path.
 
-**Stagger vs overlap:** The app serializes Chrome work in a single queue (watch, job-feed, and applies wait on each other), but long runs still queue up. On small instances, **offset** the job-feed minute from watch so a heavy job-feed scrape is less likely to start right after a long watch tick—for example use `7,37 * * * *` for job-feed instead of `*/30 * * * *` (both are roughly every 30 minutes; adjust to your schedule). Set **`WATCH_MAX_JOBS_PER_BOARD`** on the Next.js process if you need fewer jobs per board per run.
+**Stagger vs overlap:** The app serializes Chrome work in a single queue (watch, job-feed, and applies wait on each other), but long runs still queue up. On small instances, **offset** the job-feed minute from watch so a heavy job-feed scrape is less likely to start right after a long watch tick—for example use `7,37 * * * *` for job-feed instead of `*/30 * * * *` (both are roughly every 30 minutes; adjust to your schedule). Set **`WATCH_MAX_JOBS_PER_RUN`** on the Next.js process if you need fewer Auto pilot applies per run. **Auto pilot reads the job feed** built by job-feed cron — run job-feed before watch matters for fresh listings.
 
 ## 5. Chrome on EC2 (job-feed)
 
