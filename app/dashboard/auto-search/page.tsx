@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   Loader2,
   RefreshCw,
@@ -10,6 +12,7 @@ import {
   Send,
 } from 'lucide-react';
 import { ApplicationStatusBadge } from '@/components/application-status-badge';
+import { AUTO_SEARCH_PAGE_SIZE } from '@/lib/auto-search-config';
 import { JOB_BOARD_DIRECTORY } from '@/lib/job-board-directory';
 import type { CachedJobRow } from '@/lib/json-store';
 import { runInFlight, useInFlight, useInFlightMeta } from '@/lib/in-flight';
@@ -52,6 +55,9 @@ export default function AutoSearchPage() {
   const [totalMatching, setTotalMatching] = useState(0);
   const [totalJobsInCache, setTotalJobsInCache] = useState(0);
   const [returned, setReturned] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(AUTO_SEARCH_PAGE_SIZE);
+  const [totalPages, setTotalPages] = useState(0);
   const [boardsFailed, setBoardsFailed] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -87,16 +93,23 @@ export default function AutoSearchPage() {
   }, []);
 
   const fetchJobsWithFilters = useCallback(
-    async (kw: string, loc: string, dept: string, board: string) => {
+    async (
+      kw: string,
+      loc: string,
+      dept: string,
+      board: string,
+      pageNum: number
+    ) => {
       setError('');
       setMessage(null);
       const params = new URLSearchParams();
+      params.set('page', String(pageNum));
       if (kw.trim()) params.set('keywords', kw.trim());
       if (loc.trim()) params.set('location', loc.trim());
       if (dept.trim()) params.set('department', dept.trim());
       if (board.trim()) params.set('boardId', board.trim());
       const q = params.toString();
-      const url = q ? `/api/auto-search?${q}` : '/api/auto-search';
+      const url = `/api/auto-search?${q}`;
       const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load jobs');
@@ -105,6 +118,9 @@ export default function AutoSearchPage() {
       setTotalMatching(data.totalMatching ?? 0);
       setTotalJobsInCache(data.totalJobsInCache ?? 0);
       setReturned(data.returned ?? 0);
+      setPage(data.page ?? pageNum);
+      setPageSize(data.pageSize ?? AUTO_SEARCH_PAGE_SIZE);
+      setTotalPages(data.totalPages ?? 0);
       setBoardsFailed(data.boardsFailed ?? 0);
       if (typeof data.message === 'string') setMessage(data.message);
       else setMessage(null);
@@ -112,8 +128,8 @@ export default function AutoSearchPage() {
     []
   );
 
-  const filtersRef = useRef({ keywords, location, department, boardId });
-  filtersRef.current = { keywords, location, department, boardId };
+  const filtersRef = useRef({ keywords, location, department, boardId, page });
+  filtersRef.current = { keywords, location, department, boardId, page };
 
   useEffect(() => {
     let cancelled = false;
@@ -122,7 +138,7 @@ export default function AutoSearchPage() {
       setError('');
       try {
         await runInFlight('auto-search:initial', async () => {
-          await fetchJobsWithFilters('', '', '', '');
+          await fetchJobsWithFilters('', '', '', '', 1);
           await loadHistory();
         });
       } catch (e: unknown) {
@@ -142,7 +158,13 @@ export default function AutoSearchPage() {
     const id = window.setInterval(() => {
       const f = filtersRef.current;
       runInFlight('auto-search:fetch', async () => {
-        await fetchJobsWithFilters(f.keywords, f.location, f.department, f.boardId);
+        await fetchJobsWithFilters(
+          f.keywords,
+          f.location,
+          f.department,
+          f.boardId,
+          f.page
+        );
         await loadHistory();
       }).catch(() => {});
     }, 30 * 60 * 1000);
@@ -174,10 +196,11 @@ export default function AutoSearchPage() {
   const onSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setPage(1);
     setLoading(true);
     try {
       await runInFlight('auto-search:fetch', async () => {
-        await fetchJobsWithFilters(keywords, location, department, boardId);
+        await fetchJobsWithFilters(keywords, location, department, boardId, 1);
       });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load');
@@ -191,8 +214,36 @@ export default function AutoSearchPage() {
     setLoading(true);
     try {
       await runInFlight('auto-search:fetch', async () => {
-        await fetchJobsWithFilters(keywords, location, department, boardId);
+        await fetchJobsWithFilters(
+          keywords,
+          location,
+          department,
+          boardId,
+          page
+        );
         await loadHistory();
+      });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const goToPage = async (nextPage: number) => {
+    if (nextPage < 1 || (totalPages > 0 && nextPage > totalPages)) return;
+    setError('');
+    setLoading(true);
+    setPage(nextPage);
+    try {
+      await runInFlight('auto-search:fetch', async () => {
+        await fetchJobsWithFilters(
+          keywords,
+          location,
+          department,
+          boardId,
+          nextPage
+        );
       });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load');
@@ -331,10 +382,10 @@ export default function AutoSearchPage() {
                 )}
               </>
             )}
-            {returned > 0 && totalMatching > 0 && (
+            {totalMatching > 0 && totalPages > 0 && (
               <>
                 {' '}
-                · Showing {returned} of {totalMatching}
+                · Page {page} of {totalPages} ({pageSize} per page)
               </>
             )}
             {boardsFailed > 0 && (
@@ -363,6 +414,51 @@ export default function AutoSearchPage() {
       </form>
 
       <div className="bg-card rounded-xl shadow-md overflow-hidden">
+        {totalMatching > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-border bg-muted/30">
+            <p className="text-sm text-muted-foreground">
+              {returned > 0 ? (
+                <>
+                  Rows {(page - 1) * pageSize + 1}–
+                  {(page - 1) * pageSize + returned} of {totalMatching}
+                  {totalPages > 1 && (
+                    <span className="text-muted-foreground/80">
+                      {' '}
+                      · {pageSize} per page
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>No rows on this page</>
+              )}
+            </p>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={listOrFetchBusy || page <= 1}
+                  onClick={() => goToPage(page - 1)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-sm font-medium hover:bg-muted disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </button>
+                <span className="text-sm text-foreground tabular-nums px-2">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={listOrFetchBusy || page >= totalPages}
+                  onClick={() => goToPage(page + 1)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-sm font-medium hover:bg-muted disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-muted/50 border-b border-border">
@@ -472,6 +568,31 @@ export default function AutoSearchPage() {
             </tbody>
           </table>
         </div>
+        {totalMatching > 0 && totalPages > 1 && (
+          <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-t border-border bg-muted/30">
+            <button
+              type="button"
+              disabled={listOrFetchBusy || page <= 1}
+              onClick={() => goToPage(page - 1)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-sm font-medium hover:bg-muted disabled:opacity-40 disabled:pointer-events-none"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </button>
+            <span className="text-sm text-foreground tabular-nums px-2">
+              {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={listOrFetchBusy || page >= totalPages}
+              onClick={() => goToPage(page + 1)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-sm font-medium hover:bg-muted disabled:opacity-40 disabled:pointer-events-none"
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950 space-y-2">

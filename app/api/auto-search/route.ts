@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { AUTO_SEARCH_PAGE_SIZE } from '@/lib/auto-search-config';
 import type { CachedJobRow } from '@/lib/json-store';
 import { getJobFeedCacheSync } from '@/lib/json-store';
 
 export const dynamic = 'force-dynamic';
-
-const DEFAULT_LIMIT = 500;
-const MAX_LIMIT = 1000;
 
 function filterJobs(
   jobs: CachedJobRow[],
@@ -50,14 +48,16 @@ export async function GET(request: Request) {
     const location = searchParams.get('location') || undefined;
     const department = searchParams.get('department') || undefined;
     const boardId = searchParams.get('boardId') || undefined;
-    let limit = parseInt(searchParams.get('limit') || String(DEFAULT_LIMIT), 10);
-    if (!Number.isFinite(limit) || limit < 1) limit = DEFAULT_LIMIT;
-    limit = Math.min(limit, MAX_LIMIT);
+    let page = parseInt(searchParams.get('page') || '1', 10);
+    if (!Number.isFinite(page) || page < 1) page = 1;
 
     const cache = getJobFeedCacheSync();
     if (!cache || cache.jobs.length === 0) {
       return NextResponse.json({
         jobs: [],
+        page: 1,
+        pageSize: AUTO_SEARCH_PAGE_SIZE,
+        totalPages: 0,
         cacheUpdatedAt: cache?.updatedAt ?? null,
         boardsScanned: cache?.boardsScanned ?? 0,
         boardsFailed: cache?.boardsFailed ?? 0,
@@ -90,10 +90,19 @@ export async function GET(request: Request) {
     });
     const totalMatching = filtered.length;
     const totalJobsInCache = cache.jobs.length;
-    const jobs = filtered.slice(0, limit);
+    const pageSize = AUTO_SEARCH_PAGE_SIZE;
+    const totalPages =
+      totalMatching === 0 ? 0 : Math.ceil(totalMatching / pageSize);
+    const lastPage = totalPages > 0 ? totalPages : 1;
+    if (page > lastPage) page = lastPage;
+    const offset = (page - 1) * pageSize;
+    const jobs = filtered.slice(offset, offset + pageSize);
 
     return NextResponse.json({
       jobs,
+      page,
+      pageSize,
+      totalPages,
       cacheUpdatedAt: cache.updatedAt,
       boardsScanned: cache.boardsScanned,
       boardsFailed: cache.boardsFailed,
